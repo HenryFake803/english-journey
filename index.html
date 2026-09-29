@@ -3570,7 +3570,9 @@ function checkpointReasonLabel(reason) {
     'before-cloud-restore':'Antes de carregar a nuvem',
     'manual':'Ponto criado manualmente',
     'history-restore':'Restauração anterior',
-    'cloud-synced':'Sincronizado com a nuvem'
+    'cloud-synced':'Sincronizado com a nuvem',
+    'free-review-complete':'Revisão livre concluída',
+    'practice-complete':'Treino extra concluído'
   })[reason] || 'Ponto seguro';
 }
 
@@ -8367,16 +8369,24 @@ function summaryView(session) {
   const seenNow = daySeenCount(day, state);
   const dayFinished = seenNow >= day.phrases.length;
   const hardPractice = session.mode === 'hard-practice';
-  const summaryLabel = hardPractice ? 'TREINO DE DIFICULDADES CONCLUÍDO' : dayFinished ? `DIA ${session.dayId} COMPLETO` : 'SESSÃO CONCLUÍDA';
-  const summaryTitle = hardPractice ? `${session.hardCount || total} frases treinadas.` : dayFinished ? '40 frases apresentadas.' : `${session.newCount} novas frases trabalhadas.`;
-  const summaryCopy = hardPractice ? 'Você trabalhou apenas frases detectadas como difíceis. Elas voltam conforme a memória pedir, sem substituir o estudo normal.' : dayFinished ? 'Agora essas frases entram no ciclo de revisão e voltarão em momentos diferentes conforme seu desempenho.' : `Você avançou para ${seenNow}/40 frases deste dia. O restante continua disponível na próxima sessão.`;
+  const freeReview = session.mode === 'free-review';
+  const practiceSummary = hardPractice || freeReview;
+  const summaryLabel = freeReview ? 'REVISÃO LIVRE CONCLUÍDA' : hardPractice ? 'TREINO DE DIFICULDADES CONCLUÍDO' : dayFinished ? `DIA ${session.dayId} COMPLETO` : 'SESSÃO CONCLUÍDA';
+  const summaryTitle = freeReview ? `${session.reviewCount || total} frases revisadas.` : hardPractice ? `${session.hardCount || total} frases treinadas.` : dayFinished ? '40 frases apresentadas.' : `${session.newCount} novas frases trabalhadas.`;
+  const summaryCopy = freeReview
+    ? 'Você praticou apenas frases já estudadas. Nenhuma frase nova foi liberada e sua tarefa principal do dia continua exatamente como estava.'
+    : hardPractice
+      ? 'Você trabalhou apenas frases detectadas como difíceis. Elas voltam conforme a memória pedir, sem substituir o estudo normal.'
+      : dayFinished
+        ? 'Agora essas frases entram no ciclo de revisão e voltarão em momentos diferentes conforme seu desempenho.'
+        : `Você avançou para ${seenNow}/40 frases deste dia. O restante continua disponível na próxima sessão.`;
   const skills = sessionSkillBreakdown(session);
   const insight = sessionLearningInsight(session);
   const xpEarned = Math.max(0, Number(state.xp || 0) - Number(session.xpStart || 0));
   const bestStreak = Number(session.bestStreak || 0);
   const rhythms = (session.items || []).filter(item => item?.id?.startsWith('block-') && item.blockFocusLabel).map(item => item.blockFocusLabel);
   const mix = sessionExerciseMix(session);
-  const nextBrief = buildNextSessionBrief(state, session, new Date());
+  const nextBrief = freeReview ? state.nextSessionBrief : buildNextSessionBrief(state, session, new Date());
   const closure = sessionClosureSummary(session);
   const analysis = `
     ${rhythms.length ? `<section class="session-rhythm-summary"><small>RITMO DE HOJE</small><div>${rhythms.map((label, index) => `<span><i>${index + 1}</i>${escapeHtml(label)}</span>`).join('')}</div><p>${mix.total} exercícios essenciais nesta sessão · mini-revisões e desafio final foram mantidos curtos para evitar repetição.</p></section>` : ''}
@@ -8392,8 +8402,8 @@ function summaryView(session) {
     <section class="session-insight"><span>◎</span><div><small>O MAIS IMPORTANTE</small><h3>${escapeHtml(insight.title)}</h3><p>${escapeHtml(insight.text)}</p></div></section>
     ${nextBrief ? `<div class="continuity-summary summary-primary-next">${continuityCard(nextBrief, { summary:true })}</div>` : `<section class="next-review-card summary-primary-next"><small>PRÓXIMO PASSO</small><h3>${session.wrong || session.almost ? 'O que deu trabalho volta mais cedo.' : 'As frases fortes ganham mais espaço.'}</h3><p>${session.wrong || session.almost ? 'Erros e quase-acertos já influenciaram o agendamento. Você não precisa decidir o que revisar amanhã.' : 'O motor aumenta gradualmente o intervalo das frases recuperadas com segurança.'}</p></section>`}
     <details class="session-analysis"><summary>Ver análise completa da sessão</summary><div class="session-analysis-body">${analysis}</div></details>
-    ${dayFinished && phaseTransitionForDay(session.dayId) ? phaseTransitionCard(phaseTransitionForDay(session.dayId)) : ''}
-    <section class="pattern-card"><span>✦</span><div><small>${day.pattern.title}</small><h3>${day.pattern.body}</h3></div></section>
+    ${!practiceSummary && dayFinished && phaseTransitionForDay(session.dayId) ? phaseTransitionCard(phaseTransitionForDay(session.dayId)) : ''}
+    ${freeReview ? `<section class="pattern-card"><span>↻</span><div><small>PRÁTICA OPCIONAL</small><h3>Você pode parar por aqui sem perder nada. A próxima tarefa principal continua no ritmo normal.</h3></div></section>` : `<section class="pattern-card"><span>✦</span><div><small>${day.pattern.title}</small><h3>${day.pattern.body}</h3></div></section>`}
     <button class="primary big" data-finish>VOLTAR PARA HOJE</button>
   </section>`;
 }
@@ -8907,21 +8917,27 @@ function finishSession() {
   if (!session) return navigate('home');
   const beforeCompletion = clone(state);
   const dayId = Number(session.dayId || 0);
+  const practiceOnly = isOptionalPracticeMode(session.mode);
   completeDay(state, session);
-  const saved = saveState(state, 'day-complete');
-  const guarded = persistCompletionGuard(state);
-  const dayWasCompleted = state.completedDays.includes(dayId);
-  const durable = !dayWasCompleted || hasPersistedDayCompletion(dayId);
 
-  if ((!saved && !guarded) || !durable) {
+  const saveReason = session.mode === 'free-review' ? 'free-review-complete' : practiceOnly ? 'practice-complete' : 'day-complete';
+  const saved = saveState(state, saveReason);
+  const guarded = practiceOnly ? false : persistCompletionGuard(state);
+  const dayWasCompleted = state.completedDays.includes(dayId);
+  const durable = practiceOnly ? saved : (!dayWasCompleted || hasPersistedDayCompletion(dayId));
+  const persistenceFailed = practiceOnly ? !saved : ((!saved && !guarded) || !durable);
+
+  if (persistenceFailed) {
     state = beforeCompletion;
-    interactionError = 'Não consegui confirmar a gravação do Dia concluído. Seu progresso da sessão foi preservado; tente novamente com armazenamento disponível.';
+    interactionError = practiceOnly
+      ? 'Não consegui confirmar a gravação desta revisão. A sessão foi preservada para você tentar novamente.'
+      : 'Não consegui confirmar a gravação do Dia concluído. Seu progresso da sessão foi preservado; tente novamente com armazenamento disponível.';
     persistenceRecoveryNotice = 'A conclusão não foi descartada porque o armazenamento não confirmou a gravação.';
     render();
     return;
   }
 
-  saveProgressCheckpoint('day-complete', state);
+  saveProgressCheckpoint(saveReason, state);
   feedback = null;
   recallRevealed = false;
   listeningRevealed = false;
@@ -8945,7 +8961,7 @@ function escapeHtml(text) {
 }
 function capitalize(v) { return v.charAt(0).toUpperCase() + v.slice(1); }
 
-// V1.1.6 — sincronização multi-dispositivo + histórico restaurável + diagnóstico.
+// V1.2.0 — revisão livre pós-tarefa + sincronização + histórico restaurável.
 window.EnglishJourneySync = Object.freeze({
   schemaVersion: SYNC_SCHEMA_VERSION,
   deviceId: CURRENT_DEVICE_ID,
