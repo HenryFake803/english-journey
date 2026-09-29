@@ -14,7 +14,7 @@
 <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
 
 
-<title>English Journey — V1.3.0</title>
+<title>English Journey — V1.3.1</title>
 <style>
 :root {
   --bg: #07111f;
@@ -1224,6 +1224,33 @@ button:focus-visible,.choice:focus-visible,summary:focus-visible{outline:2px sol
   .lesson-card-wrap { padding-bottom:112px; }
   .choice { min-height:60px; }
   .bottom-nav { bottom:calc(9px + env(safe-area-inset-bottom)); width:min(calc(100% - 18px), 704px); }
+}
+
+/* V1.3.1 — Missão 40 */
+.mission-40 { margin:18px 0 12px; padding:15px; border-radius:20px; background:linear-gradient(145deg, rgba(120,237,171,.055), rgba(8,18,31,.32)); border:1px solid rgba(120,237,171,.14); }
+.mission-40 > header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:11px; }
+.mission-40 > header > div { display:flex; align-items:baseline; gap:8px; }
+.mission-40 small { color:var(--accent); font-size:9px; font-weight:950; letter-spacing:.12em; }
+.mission-40 > header strong { font-size:20px; letter-spacing:-.03em; }
+.mission-40 > header > span { color:var(--muted); font-size:9px; font-weight:900; }
+.mission-40.complete > header > span { color:var(--yellow); }
+.mission-40-blocks { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; }
+.mission-40-blocks > div { display:grid; justify-items:center; gap:3px; padding:9px 5px; border-radius:14px; background:rgba(255,255,255,.025); border:1px solid var(--line); }
+.mission-40-blocks i { width:24px; height:24px; display:grid; place-items:center; border-radius:9px; background:var(--soft); color:var(--muted); font-size:9px; font-style:normal; font-weight:950; }
+.mission-40-blocks b { font-size:11px; }
+.mission-40-blocks span { color:var(--muted); font-size:8px; }
+.mission-40-blocks .current { border-color:rgba(255,211,109,.18); background:rgba(255,211,109,.035); }
+.mission-40-blocks .current i { color:var(--yellow); background:rgba(255,211,109,.10); }
+.mission-40-blocks .done { border-color:rgba(120,237,171,.17); background:rgba(120,237,171,.04); }
+.mission-40-blocks .done i { color:#07140d; background:var(--accent); }
+.mission-40 > p { margin:10px 0 0; color:var(--muted); font-size:9px; line-height:1.45; }
+.checkpoint-status.mini { color:#a9d8ff; border-color:rgba(141,199,255,.15); background:rgba(141,199,255,.055); }
+.checkpoint-card.mini-review { border-color:rgba(141,199,255,.14); background:radial-gradient(circle at 50% -10%, rgba(141,199,255,.09), transparent 19rem), linear-gradient(155deg, rgba(18,34,52,.98), rgba(9,21,36,.98)); }
+.checkpoint-card.mini-review .checkpoint-icon { background:linear-gradient(145deg, #c7e6ff, #8dc7ff); box-shadow:0 14px 32px rgba(141,199,255,.14); }
+@media (max-width:430px) {
+  .mission-40 { padding:13px 11px; }
+  .mission-40-blocks { gap:5px; }
+  .mission-40-blocks > div { padding:8px 3px; }
 }
 </style>
 </head>
@@ -2877,7 +2904,7 @@ function familyVariations(pattern) {
   return FAMILY_VARIATIONS[pattern] || [];
 }
 
-const APP_RELEASE = Object.freeze({ version: '1.3.0', channel: 'visual-gamefeel-pass' });
+const APP_RELEASE = Object.freeze({ version: '1.3.1', channel: 'mission-40-block-flow' });
 const KEY = 'english-journey-v061';
 const DEVICE_KEY = `${KEY}-device-id`;
 const SYNC_SCHEMA_VERSION = 1;
@@ -4460,6 +4487,8 @@ function dateKeyFromIso(value) {
 }
 
 const BLOCK_SIZE = 10;
+const DAILY_NEW_TARGET = 40;
+const DAILY_BLOCK_TARGET = DAILY_NEW_TARGET / BLOCK_SIZE;
 const DAY_MS = 86400000;
 const MAX_INTERVAL_DAYS = 120;
 const SRS_INTERVAL_LADDER = Object.freeze([2, 3, 5, 8, 14, 21, 30, 45, 60, 90, 120]);
@@ -5100,38 +5129,35 @@ function dailyNewLoad(state, now = new Date()) {
 }
 
 function adaptiveNewPhraseGoal(state, now = new Date(), profile = adaptiveSessionProfile(state, now), reviewLoad = reviewPressure(state, now)) {
-  const due = reviewLoad.count;
-  const pressure = reviewLoad.pressure;
+  const pressure = Number(reviewLoad?.pressure || 0);
   const hard = difficultPhrases(state).length;
   const calendar = calendarStatus(state, now);
-  let goal = 40;
-  const reasons = [];
-
-  // V0.9.6 — não reduzimos conteúdo novo só porque muitas frases acabaram de vencer.
-  // A pressão pondera atraso, dificuldade e estabilidade: uma revisão forte recém-vencida
-  // pesa menos que uma frase frágil, recorrente ou vários dias atrasada.
-  if (pressure >= 150) { goal = 0; reasons.push('pressão crítica de revisão'); }
-  else if (pressure >= 115) { goal = 10; reasons.push('pressão muito alta de revisão'); }
-  else if (pressure >= 80) { goal = 20; reasons.push('memória pedindo mais consolidação'); }
-  else if (pressure >= 50) { goal = 30; reasons.push('revisões relevantes acima do ritmo normal'); }
-
-  if (hard >= 30 && goal > 10) { goal = 10; reasons.push('muitas frases difíceis'); }
-  else if (hard >= 20 && goal > 20) { goal = 20; reasons.push('frases difíceis acumuladas'); }
-  else if (hard >= 12 && goal > 30) { goal = 30; reasons.push('reforço necessário'); }
-
-  if (calendar.daysMissed >= 7 && goal > 0) { goal = 0; reasons.push('retomada após pausa longa'); }
-  else if (calendar.daysMissed >= 4 && goal > 10) { goal = 10; reasons.push('retomada gradual'); }
-  else if (calendar.daysMissed >= 2 && goal > 20) { goal = 20; reasons.push('ritmo sendo recuperado'); }
-  else if (calendar.daysMissed >= 1 && goal > 30) { goal = 30; reasons.push('um dia fora do ritmo'); }
-
   const recent = profile?.recent?.overall;
-  if (recent != null && recent < 0.55 && goal > 20) { goal = 20; reasons.push('retenção recente pediu menos conteúdo novo'); }
-  else if (recent != null && recent < 0.68 && goal > 30) { goal = 30; reasons.push('retenção recente ainda instável'); }
+  const notes = [];
 
-  if (profile?.recurringTotal >= 12 && goal > 20) { goal = 20; reasons.push('erros recorrentes em consolidação'); }
-  else if (profile?.recurringTotal >= 6 && goal > 30) { goal = 30; reasons.push('alguns erros recorrentes ativos'); }
+  // V1.3.1 — 40 novas continuam disponíveis. O motor orienta o ritmo,
+  // mas não reduz silenciosamente a meta do aluno por causa das revisões.
+  if (pressure >= 115) notes.push('há bastante revisão acumulada; a sessão pode ficar mais longa');
+  else if (pressure >= 80) notes.push('sua memória está pedindo mais revisões hoje');
+  else if (pressure >= 50) notes.push('há revisões relevantes junto das frases novas');
 
-  return { goal, reason: reasons[0] || 'memória em dia para avançar', reasons };
+  if (hard >= 20) notes.push('várias frases estão em reforço');
+  else if (hard >= 12) notes.push('algumas frases pedem reforço');
+
+  if (calendar.daysMissed >= 7) notes.push('você está retomando após uma pausa longa');
+  else if (calendar.daysMissed >= 2) notes.push('o app vai misturar mais revisão durante a retomada');
+
+  if (recent != null && recent < 0.55) notes.push('a retenção recente ficou baixa');
+  else if (recent != null && recent < 0.68) notes.push('a retenção recente ainda está se firmando');
+
+  if (profile?.recurringTotal >= 6) notes.push('há dificuldades recorrentes sendo acompanhadas');
+
+  return {
+    goal: DAILY_NEW_TARGET,
+    reason: notes[0] || '40 novas disponíveis para avançar',
+    reasons: notes,
+    advisory: notes.length ? notes.slice(0, 2).join(' · ') : 'memória em dia para avançar'
+  };
 }
 
 function adaptiveReviewPriority(progress, now, focusSkill = null) {
@@ -5195,10 +5221,10 @@ function sessionPlan(state, dayId = nextUnlockedDay(state), now = new Date()) {
   if (!day) return { newGoal: 0, due, reviewCount: 0, reviewCap: 0, hardCount: 0, hardLimit: 0, estimatedMinutes: 0, remaining: 0, mode: 'normal', calendar, adaptation, dayLoad };
   const remaining = day.phrases.filter(p => !getPhraseProgress(state, p.id).seen).length;
   const newDecision = adaptiveNewPhraseGoal(state, now, adaptation, reviewLoad);
-  const dailyCap = dayLoad.lockedCap == null ? newDecision.goal : Math.min(dayLoad.lockedCap, newDecision.goal);
+  const dailyCap = DAILY_NEW_TARGET;
   const availableNewToday = Math.max(0, dailyCap - dayLoad.introduced);
   const newGoal = Math.min(availableNewToday, remaining);
-  const dailyCapReached = dayLoad.lockedCap != null && remaining > 0 && availableNewToday <= 0;
+  const dailyCapReached = remaining > 0 && availableNewToday <= 0;
   const difficultCount = difficultPhrases(state).length;
   const mode = dailyCapReached
     ? 'daily-complete'
@@ -5219,7 +5245,7 @@ function sessionPlan(state, dayId = nextUnlockedDay(state), now = new Date()) {
   const estimatedMinutes = rawMinutes > 0 ? Math.max(5, Math.round(rawMinutes)) : 0;
   const loadLabel = mode === 'daily-complete' ? 'META DO DIA' : mode === 'consolidation' ? 'CONSOLIDAR' : mode === 'recovery' ? 'RETOMAR' : mode === 'catchup' ? 'EQUILIBRAR' : 'AVANÇAR';
   const dailyReason = dailyCapReached
-    ? `teto de ${dailyCap} ${dailyCap === 1 ? 'frase nova' : 'frases novas'} já concluído hoje`
+    ? `meta de ${dailyCap} frases novas já concluída hoje`
     : newDecision.reason;
   return {
     newGoal, due, reviewCount, reviewCap, hardCount, hardLimit, estimatedMinutes, remaining, mode, calendar,
@@ -5695,6 +5721,13 @@ function buildSession(state, dayId = nextUnlockedDay(state), now = new Date()) {
 
   const unseen = day.phrases.filter(p => !getPhraseProgress(state, p.id).seen);
   const selected = unseen.slice(0, plan.newGoal);
+  const selectedIds = new Set(selected.map(phrase => phrase.id));
+  const fixedBlocks = chunk(day.phrases, BLOCK_SIZE)
+    .map((phrases, index) => ({
+      blockNumber:index + 1,
+      phrases:phrases.filter(phrase => selectedIds.has(phrase.id))
+    }))
+    .filter(block => block.phrases.length);
   const items = [];
 
   if (reviewPhrases.length) {
@@ -5719,11 +5752,11 @@ function buildSession(state, dayId = nextUnlockedDay(state), now = new Date()) {
     });
   }
 
-  const blocks = chunk(selected, BLOCK_SIZE);
+  const blocks = fixedBlocks;
   const sessionPatterns = new Set();
   let patternDiscoveries = 0;
-  blocks.forEach((block, blockIndex) => {
-    const blockNumber = blockIndex + 1;
+  blocks.forEach(({ phrases:block, blockNumber }) => {
+    const blockIndex = blockNumber - 1;
     const blockTitle = day.blocks?.[blockIndex] || `Bloco ${blockNumber}`;
     const rhythm = adaptiveSessionBlockRhythm(dayId, blockIndex, plan.focusSkill);
     const rhythmMeta = {
@@ -5735,10 +5768,10 @@ function buildSession(state, dayId = nextUnlockedDay(state), now = new Date()) {
     };
     items.push(checkpoint(
       `block-${blockNumber}`,
-      `${blockNumber}º bloco de ${blocks.length}`,
+      `Bloco ${blockNumber} de ${DAILY_BLOCK_TARGET}`,
       `${block.length} frases novas · ${blockTitle}`,
-      'NOVAS FRASES',
-      { blockNumber, blockTotal: blocks.length, ...rhythmMeta }
+      'MISSÃO 40',
+      { blockNumber, blockTotal: DAILY_BLOCK_TARGET, ...rhythmMeta }
     ));
 
     block.forEach((phrase, index) => {
@@ -5754,7 +5787,7 @@ function buildSession(state, dayId = nextUnlockedDay(state), now = new Date()) {
         rhythm.miniTitle,
         rhythm.miniBody,
         `FIXAÇÃO · ${rhythm.label}`,
-        { blockNumber, blockTotal: blocks.length, ...rhythmMeta }
+        { blockNumber, blockTotal: DAILY_BLOCK_TARGET, ...rhythmMeta }
       ));
       miniSet.forEach((phrase, index) => {
         const forcedType = rhythm.miniTypes[index % rhythm.miniTypes.length];
@@ -5770,6 +5803,14 @@ function buildSession(state, dayId = nextUnlockedDay(state), now = new Date()) {
         patternDiscoveries++;
       }
     }
+
+    items.push(checkpoint(
+      `block-end-${blockNumber}`,
+      `Bloco ${blockNumber} concluído`,
+      blockNumber < DAILY_BLOCK_TARGET ? `Você fechou mais 10 frases da Missão 40. O próximo bloco fica pronto quando quiser continuar.` : 'As quatro partes da Missão 40 foram concluídas.',
+      blockNumber < DAILY_BLOCK_TARGET ? 'PONTO SEGURO' : 'MISSÃO 40',
+      { blockNumber, blockTotal: DAILY_BLOCK_TARGET, ...rhythmMeta }
+    ));
   });
 
   const variationItems = ['consolidation','daily-complete'].includes(plan.mode) ? [] : buildFamilyVariationItems(state, now, 1);
@@ -5781,7 +5822,7 @@ function buildSession(state, dayId = nextUnlockedDay(state), now = new Date()) {
   if (selected.length) {
     // Um representante por bloco: o desafio final confirma a sessão sem repetir
     // dez frases que já passaram por recuperação imediata e mini-revisão.
-    const challengeSet = blocks.map(block => block[Math.min(block.length - 1, 7)]).filter(Boolean).slice(0, 4);
+    const challengeSet = blocks.map(block => block.phrases[Math.min(block.phrases.length - 1, 7)]).filter(Boolean).slice(0, 4);
     if (challengeSet.length) {
       const challenge = adaptiveDailyChallengeProfile(dayId, plan.focusSkill);
       items.push(checkpoint('daily-challenge', challenge.title, challenge.body, challenge.eyebrow, { challengeFocus: challenge.id }));
@@ -5810,11 +5851,11 @@ function buildSession(state, dayId = nextUnlockedDay(state), now = new Date()) {
     reviewCount: reviewPhrases.length,
     hardCount: hardPhrases.length,
     patternCount: patternDiscoveries,
-    sessionRhythms: blocks.map((_, index) => adaptiveSessionBlockRhythm(dayId, index, plan.focusSkill).id),
+    sessionRhythms: blocks.map(block => adaptiveSessionBlockRhythm(dayId, block.blockNumber - 1, plan.focusSkill).id),
     challengeFocus: selected.length ? adaptiveDailyChallengeProfile(dayId, plan.focusSkill).id : null,
     pacing: {
       miniReviewPerBlock: 3,
-      challengeCount: selected.length ? Math.min(blocks.length, 4) : 0,
+      challengeCount: selected.length ? Math.min(blocks.length, DAILY_BLOCK_TARGET) : 0,
       patternLimit: 1,
       variationLimit: 1,
       stopPoints: blocks.length
@@ -7826,7 +7867,7 @@ function firstRunView() {
         <div class="first-run-step"><span>2</span><b>Tente recuperar</b><p>Logo depois, você precisa lembrar — sem digitar e sem usar microfone.</p></div>
         <div class="first-run-step"><span>3</span><b>Volte na hora certa</b><p>Erros, quase-acertos e listening ajustam as revisões automaticamente.</p></div>
       </div>
-      <div class="first-run-promise"><span>primeiro bloco: até 10 frases</span><span>pode pausar depois do bloco</span><span>meta máxima: 40/dia</span></div>
+      <div class="first-run-promise"><span>4 blocos de 10 frases</span><span>pode pausar depois de cada bloco</span><span>meta: 40 novas por dia</span></div>
       <button type="button" class="primary big" data-onboarding-start>COMEÇAR PRIMEIRO BLOCO</button>
       <button type="button" class="ghost big first-run-account" data-nav="account">JÁ TENHO CONTA</button>
       <p class="first-run-note">Não há teste de nível antes de começar. O próprio desempenho calibra a dificuldade.</p>
@@ -7981,6 +8022,27 @@ function accountView() {
   </div>`;
 }
 
+function mission40Progress(day, appState) {
+  const seen = daySeenCount(day, appState);
+  const blocks = Array.from({length:DAILY_BLOCK_TARGET}, (_, index) => {
+    const start = index * BLOCK_SIZE;
+    const phrases = day.phrases.slice(start, start + BLOCK_SIZE);
+    const count = phrases.filter(phrase => getPhraseProgress(appState, phrase.id).seen).length;
+    return { number:index + 1, count, complete:count >= phrases.length && phrases.length > 0, current:count > 0 && count < phrases.length };
+  });
+  return { seen, blocks, complete:seen >= Math.min(DAILY_NEW_TARGET, day.phrases.length) };
+}
+
+function mission40Card(day, appState) {
+  const mission = mission40Progress(day, appState);
+  const next = mission.blocks.find(block => !block.complete);
+  return `<section class="mission-40 ${mission.complete ? 'complete' : ''}">
+    <header><div><small>MISSÃO 40</small><strong>${mission.seen}/${Math.min(DAILY_NEW_TARGET, day.phrases.length)}</strong></div><span>${mission.complete ? '★ CONCLUÍDA' : next ? `PRÓXIMO · BLOCO ${next.number}` : ''}</span></header>
+    <div class="mission-40-blocks">${mission.blocks.map(block => `<div class="${block.complete ? 'done' : block.current ? 'current' : ''}"><i>${block.complete ? '✓' : block.number}</i><b>${block.count}/10</b><span>bloco ${block.number}</span></div>`).join('')}</div>
+    <p>${mission.complete ? 'As 40 novas entraram no ciclo. Daqui para frente, hoje é manutenção opcional.' : 'Quatro blocos curtos de 10. Você pode pausar depois de cada bloco sem perder o ponto.'}</p>
+  </section>`;
+}
+
 function dailyStudyBrief(plan, options = {}) {
   const completedAll = Boolean(options.completedAll);
   const activeSession = options.activeSession || null;
@@ -7991,18 +8053,18 @@ function dailyStudyBrief(plan, options = {}) {
     ? Number(activeSession.estimatedMinutes || Math.max(5, Math.round(newCount * .42 + reviewCount * .16)))
     : Number(plan?.estimatedMinutes || 0);
 
-  let title = 'Avance com novas frases';
+  let title = 'Continue a Missão 40';
   if (completedAll) title = reviewCount ? 'Mantenha suas frases vivas' : 'Faça uma revisão curta';
-  else if (plan?.mode === 'consolidation') title = 'Hoje é dia de consolidar';
-  else if (plan?.mode === 'recovery') title = 'Recupere o ritmo antes de avançar';
-  else if (plan?.mode === 'catchup') title = 'Equilibre revisões e frases novas';
+  else if (plan?.mode === 'consolidation') title = 'Missão 40 concluída · consolidar';
+  else if (plan?.mode === 'recovery') title = 'Revisar e seguir com a Missão 40';
+  else if (plan?.mode === 'catchup') title = 'Equilibre sem abrir mão das novas';
   else if (plan?.dailyCapReached) title = reviewCount ? 'A meta de novas já foi concluída' : 'A tarefa principal de hoje está concluída';
   else if (reviewCount && newCount) title = 'Revise primeiro, depois avance';
   else if (reviewCount) title = 'Comece pelas revisões';
   else if (!newCount) title = 'Mantenha o que você já aprendeu';
 
   let sequence = '';
-  if (reviewCount && newCount) sequence = `Primeiro ${reviewCount} ${reviewCount === 1 ? 'revisão' : 'revisões'} prioritárias; depois até ${newCount} ${newCount === 1 ? 'frase nova' : 'frases novas'}.`;
+  if (reviewCount && newCount) sequence = `${reviewCount} ${reviewCount === 1 ? 'revisão prioritária entra' : 'revisões prioritárias entram'} como apoio. Suas ${newCount} novas continuam disponíveis em blocos de 10.`;
   else if (reviewCount) sequence = `${reviewCount} ${reviewCount === 1 ? 'revisão entra' : 'revisões entram'} nesta sessão. Nenhuma frase nova precisa ser adicionada agora.`;
   else if (newCount) sequence = `Sua memória está em dia para avançar com até ${newCount} ${newCount === 1 ? 'frase nova' : 'frases novas'}.`;
   else sequence = 'Não há uma carga obrigatória nova agora. Você pode manter a memória com uma revisão curta.';
@@ -8078,6 +8140,7 @@ function homeView() {
       <div class="today-card-head"><div><small>${completedAll ? 'CURSO BASE CONCLUÍDO' : `FASE ${phaseForDay(day.id)?.id || 5} · DIA ${day.id} DE 30`}</small><span>${s.streak ? `🔥 ${s.streak} ${s.streak === 1 ? 'dia' : 'dias'}` : 'Comece sua sequência'}</span></div></div>
       <h1>${completedAll ? 'Consolidar o que já é seu.' : day.title}</h1>
       <p>${completedAll ? 'As 1.200 frases já entraram no ciclo. Agora o foco é retenção, listening e produção.' : day.subtitle}</p>
+      ${!completedAll ? mission40Card(day, state) : ''}
       <div class="today-answer"><small>O QUE FAZER AGORA</small><strong>${escapeHtml(dailyBrief.title)}</strong><p>${escapeHtml(dailyBrief.sequence)}</p></div>
       <div class="today-plan">
         <span class="due"><small>REVISÕES</small><b>${dailyBrief.reviewCount}</b><em>${dailyBrief.totalDue > dailyBrief.reviewCount && !hasSession ? `de ${dailyBrief.totalDue} vencidas` : 'prioridade agora'}</em></span>
@@ -8088,7 +8151,7 @@ function homeView() {
         ? `<button class="primary big today-cta" data-start="${day.id}">${hasFinishedSession ? 'VER RESUMO DA SESSÃO' : hasActive ? sessionResumeLabel(state.activeSession) : completedAll ? 'TREINAR AGORA' : plan.mode === 'recovery' ? 'COMEÇAR RETOMADA' : plan.mode === 'daily-complete' ? 'REVISAR O QUE JÁ APRENDEU' : 'COMEÇAR SESSÃO'}</button>`
         : `<button class="secondary big today-cta" type="button" disabled>META DE NOVAS CONCLUÍDA HOJE</button>`}
       ${!hasSession ? todayGuidance(plan, continuity) : ''}
-      ${!completedAll ? `<div class="today-progress"><div><span>${seenToday}/40 do dia</span><b>${Math.round(seenToday / 40 * 100)}%</b></div><div class="progress-track"><i style="width:${Math.round(seenToday / 40 * 100)}%"></i></div><small>${hasSession ? 'Seu ponto está salvo. Cada bloco concluído é um ponto seguro para pausar e continuar depois.' : plan.dailyCapReached ? `Você já concluiu o teto de ${plan.dailyNewCap} novas de hoje. Amanhã o motor recalcula a carga.` : plan.newGoal < 40 ? `Hoje a carga foi ajustada para até ${plan.newGoal} novas para proteger a retenção.` : 'Ritmo compacto: 4 blocos de até 10 frases, com ponto de pausa entre eles.'}</small></div>` : ''}
+      ${!completedAll ? `<div class="today-progress"><div><span>${seenToday}/40 da missão</span><b>${Math.round(seenToday / 40 * 100)}%</b></div><div class="progress-track"><i style="width:${Math.round(seenToday / 40 * 100)}%"></i></div><small>${hasSession ? 'Seu ponto está salvo. Cada bloco realmente concluído vira um ponto seguro para pausar.' : plan.dailyCapReached ? 'As 40 novas de hoje já foram concluídas.' : plan.newGoal < 40 ? `Faltam ${plan.newGoal} novas neste dia do curso. Revisões não reduzem essa disponibilidade.` : 'Meta disponível: 4 blocos de 10 frases. Revisões entram como apoio, não como substituição.'}</small></div>` : ''}
     </section>
     ${postTaskReviewCard(state, now, hasSession)}
 
@@ -8533,6 +8596,7 @@ function lessonStage(session, item) {
   const blockNumber = Number(item.blockNumber || activeLessonBlock(session));
   if (!blockNumber) return { primary: 'SESSÃO', secondary: `${session.index + 1}/${session.items.length}` };
   const blockTotal = Math.max(1, ...session.items.map(x => Number(x?.blockTotal || x?.blockNumber || 0)));
+  if (item.id?.startsWith('block-end-')) return { primary: `BLOCO ${blockNumber}/${blockTotal}`, secondary: 'concluído · ponto seguro' };
   if (item.id?.startsWith('mini-') || item.reviewKind === 'mini') return { primary: `BLOCO ${blockNumber}/${blockTotal}`, secondary: `${item.blockFocusLabel ? `${item.blockFocusLabel} · ` : ''}mini revisão` };
   if (item.type === 'pattern') return { primary: `BLOCO ${blockNumber}/${blockTotal}`, secondary: `${item.blockFocusLabel ? `${item.blockFocusLabel} · ` : ''}padrão` };
   const intros = session.items.filter(x => x?.type === 'intro' && Number(x.blockNumber) === blockNumber);
@@ -8551,15 +8615,17 @@ function activeLessonBlock(session) {
 }
 
 function checkpointCard(item, session) {
-  const recap = item.id?.startsWith('mini-') && item.blockNumber ? blockRecap(session, item.blockNumber) : '';
-  const isBlockStart = item.id?.startsWith('block-');
+  const isMini = item.id?.startsWith('mini-');
+  const isBlockEnd = item.id?.startsWith('block-end-');
+  const isBlockStart = item.id?.startsWith('block-') && !isBlockEnd;
+  const recap = isBlockEnd && item.blockNumber ? blockRecap(session, item.blockNumber) : '';
   const day = curriculum.find(entry => entry.id === session?.dayId);
   const bridge = isBlockStart && Number(item.blockNumber) === 1 && day?.learning ? learningBridgeCard(day.learning) : '';
-  const focus = isBlockStart && item.blockFocusTitle ? `<section class="block-focus-card focus-${escapeHtml(item.blockFocus || 'mixed')}"><span>${escapeHtml(item.blockIcon || '◆')}</span><div><small>RITMO DESTE BLOCO</small><b>${escapeHtml(item.blockFocusTitle)}</b><p>${escapeHtml(item.blockFocusDescription || '')}</p></div></section>` : '';
-  const firstUse = isBlockStart && Number(item.blockNumber) === 1 && session?.firstJourneySession ? `<section class="session-checkout-note"><small>PRIMEIRA SESSÃO</small><b>Uma frase de cada vez.</b><p>Veja a frase, tente usá-la na etapa seguinte e não se preocupe em acertar tudo. Depois de até 10 novas, você ganha um ponto seguro para pausar.</p></section>` : '';
-  const icon = item.id?.startsWith('mini-') ? '↻' : item.id === 'session-checkout' ? '✓' : item.id === 'daily-challenge' ? '◆' : item.id === 'review-start' ? '⏱' : item.id === 'hard-focus' || item.id === 'hard-practice' ? '↻' : item.blockIcon || '10';
-  return `<article class="checkpoint-card ${item.id?.startsWith('mini-') ? 'block-complete' : ''} ${item.blockFocus ? `focus-${escapeHtml(item.blockFocus)}` : ''}">
-    ${item.id?.startsWith('mini-') ? `<div class="checkpoint-status">✓ BLOCO ${item.blockNumber} CONCLUÍDO</div>` : ''}
+  const focus = isBlockStart && item.blockFocusTitle ? `<section class="block-focus-card focus-${escapeHtml(item.blockFocus || 'mixed')}"><span>${escapeHtml(item.blockIcon || '◆')}</span><div><small>FOCO DESTE BLOCO</small><b>${escapeHtml(item.blockFocusTitle)}</b><p>${escapeHtml(item.blockFocusDescription || '')}</p></div></section>` : '';
+  const firstUse = isBlockStart && Number(item.blockNumber) === 1 && session?.firstJourneySession ? `<section class="session-checkout-note"><small>PRIMEIRO BLOCO</small><b>Só dez frases por vez.</b><p>Conclua este bloco e decida depois se quer seguir. Seu progresso fica salvo no ponto seguro.</p></section>` : '';
+  const icon = isBlockEnd ? '✓' : isMini ? '↻' : item.id === 'session-checkout' ? '✓' : item.id === 'daily-challenge' ? '◆' : item.id === 'review-start' ? '⏱' : item.id === 'hard-focus' || item.id === 'hard-practice' ? '↻' : item.blockIcon || '10';
+  return `<article class="checkpoint-card ${isBlockEnd ? 'block-complete' : isMini ? 'mini-review' : ''} ${item.blockFocus ? `focus-${escapeHtml(item.blockFocus)}` : ''}">
+    ${isBlockEnd ? `<div class="checkpoint-status">✓ ${item.blockNumber * BLOCK_SIZE}/${DAILY_NEW_TARGET} DA MISSÃO</div>` : isMini ? '<div class="checkpoint-status mini">MINI REVISÃO · 3 FRASES</div>' : ''}
     <div class="checkpoint-icon">${escapeHtml(icon)}</div>
     <small>${escapeHtml(item.eyebrow || 'PRÓXIMA ETAPA')}</small>
     <h1>${escapeHtml(item.title)}</h1>
@@ -8570,8 +8636,8 @@ function checkpointCard(item, session) {
     ${item.id === 'session-checkout' ? `<section class="session-checkout-note"><small>SEM NOVAS FRASES</small><b>${item.checkoutCount || session.closureCount || 0} confirmações e acabou.</b><p>Este fechamento não aumenta sua meta diária e não cria repetição infinita. Ele só verifica os pontos que terminaram frágeis.</p></section>` : ''}
     ${recap}
     ${item.blockNumber ? `<div class="block-dots">${Array.from({length:item.blockTotal}, (_,i) => `<i class="${i < item.blockNumber ? 'done' : ''}"></i>`).join('')}</div>` : ''}
-    <button type="button" class="primary big" data-checkpoint-next>CONTINUAR</button>
-    ${item.id?.startsWith('mini-') ? `<button type="button" class="ghost big pause-session" data-pause-session>PAUSAR POR AQUI</button><small class="pause-note">Seu progresso já está salvo. Você continua exatamente daqui.</small>` : ''}
+    <button type="button" class="primary big" data-checkpoint-next>${isBlockEnd && item.blockNumber < DAILY_BLOCK_TARGET ? 'CONTINUAR PARA O PRÓXIMO BLOCO' : isBlockEnd ? 'SEGUIR PARA O FECHAMENTO' : isMini ? 'FAZER MINI REVISÃO' : 'CONTINUAR'}</button>
+    ${isBlockEnd && item.blockNumber < DAILY_BLOCK_TARGET ? `<button type="button" class="ghost big pause-session" data-pause-session>PARAR POR HOJE</button><small class="pause-note">Ponto seguro criado. Você continua do próximo bloco quando voltar.</small>` : ''}
   </article>`;
 }
 
