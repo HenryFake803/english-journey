@@ -14,7 +14,7 @@
 <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
 
 
-<title>English Journey — V1.2.3</title>
+<title>English Journey — V1.2.4</title>
 <style>
 :root {
   --bg: #08101d;
@@ -2594,7 +2594,7 @@ function familyVariations(pattern) {
   return FAMILY_VARIATIONS[pattern] || [];
 }
 
-const APP_RELEASE = Object.freeze({ version: '1.2.3', channel: 'srs-stability-audit' });
+const APP_RELEASE = Object.freeze({ version: '1.2.4', channel: 'progression-regression-audit' });
 const KEY = 'english-journey-v061';
 const DEVICE_KEY = `${KEY}-device-id`;
 const SYNC_SCHEMA_VERSION = 1;
@@ -4187,7 +4187,7 @@ function spacedIntervalFloor(successfulReviews = 0) {
   return SRS_INTERVAL_LADDER[Math.min(SRS_INTERVAL_LADDER.length - 1, count - 1)];
 }
 
-function srsIntervalDays({ outcome, reviewKind, freeReview = false, stability = 1, skillScore = 0, successfulReviews = 0 }) {
+function srsIntervalDays({ outcome, reviewKind, freeReview = false, stability = 1, skillScore = 0, successfulReviews = 0, preMastery = true }) {
   if (outcome !== 'correct') return 1;
   if (reviewKind === 'immediate' || reviewKind === 'recovery' || freeReview) return 1;
   if (reviewKind === 'exit') return Math.max(1, Math.min(2, Math.round(stability)));
@@ -4203,8 +4203,11 @@ function srsIntervalDays({ outcome, reviewKind, freeReview = false, stability = 
     : score < 0.48 ? 3
       : score < 0.62 ? 7
         : MAX_INTERVAL_DAYS;
+  // Antes do domínio comprovado, mantemos pelo menos um contato semanal.
+  // Depois do domínio, a estabilidade pode empurrar a frase para 14/21/30+ dias.
+  const consolidationCeiling = preMastery ? 7 : MAX_INTERVAL_DAYS;
 
-  return Math.max(2, Math.min(MAX_INTERVAL_DAYS, weakSkillCeiling, Math.max(adaptive, floor)));
+  return Math.max(2, Math.min(MAX_INTERVAL_DAYS, weakSkillCeiling, consolidationCeiling, Math.max(adaptive, floor)));
 }
 
 
@@ -6351,7 +6354,13 @@ function buildFreeReviewSession(state, now = new Date(), limit = 12) {
   selected.forEach((phrase, index) => {
     const progress = getPhraseProgress(state, phrase.id);
     const type = recommendedExerciseType(progress, now);
-    items.push({ ...makeExercise(phrase, state, 5200 + previousFree * 37 + index, true, type, 'practice'), freeReview:true });
+    // Se a frase já estava vencida, esta tentativa é uma revisão espaçada legítima.
+    // Frases extras continuam sendo prática opcional e não aceleram o SRS artificialmente.
+    items.push({
+      ...makeExercise(phrase, state, 5200 + previousFree * 37 + index, true, type, 'practice'),
+      freeReview:true,
+      freeReviewDue:dueIds.has(phrase.id)
+    });
   });
 
   return {
@@ -6425,7 +6434,7 @@ function recordOutcome(state, item, outcome, now = new Date(), meta = {}) {
       ? Math.max(1, stability)
       : Math.min(MAX_INTERVAL_DAYS, Math.max(stability + 0.5, stability * (kindFactor - difficulty * 0.42 + latenessBonus)));
     difficulty = clamp(difficulty - (item.reviewKind === 'immediate' ? 0.01 : 0.045), 0.1, 0.95);
-    const countsAsSpacedReview = !item.freeReview && ['scheduled','practice','hard'].includes(item.reviewKind) && previousSkillReviewDay !== todayKey(now);
+    const countsAsSpacedReview = (!item.freeReview || item.freeReviewDue) && ['scheduled','practice','hard'].includes(item.reviewKind) && previousSkillReviewDay !== todayKey(now);
     const spacedDays = Array.isArray(skillState.successfulReviewDays) ? [...skillState.successfulReviewDays] : [];
     if (countsAsSpacedReview) spacedDays.push(todayKey(now));
     skillState.successfulReviewDays = [...new Set(spacedDays.filter(isDateKey))].sort().slice(-60);
@@ -6444,10 +6453,11 @@ function recordOutcome(state, item, outcome, now = new Date(), meta = {}) {
   const intervalDays = srsIntervalDays({
     outcome,
     reviewKind: item.reviewKind,
-    freeReview: Boolean(item.freeReview),
+    freeReview: Boolean(item.freeReview && !item.freeReviewDue),
     stability,
     skillScore: Number(current[skill] || 0),
-    successfulReviews: Number(skillState.successfulReviews || 0)
+    successfulReviews: Number(skillState.successfulReviews || 0),
+    preMastery: !isMastered(current, now)
   });
 
   schedule[skill] = {
@@ -6459,7 +6469,14 @@ function recordOutcome(state, item, outcome, now = new Date(), meta = {}) {
   };
 
   const score = current[skill] || 0;
-  const baseGain = item.freeReview ? 0.10 : item.reviewKind === 'immediate' ? 0.18 : item.reviewKind === 'recovery' ? 0.16 : item.reviewKind === 'exit' ? 0.12 : item.reviewKind === 'mini' ? 0.23 : 0.3;
+  const baseGain = item.freeReview && !item.freeReviewDue ? 0.10
+    : item.reviewKind === 'immediate' ? 0.18
+      : item.reviewKind === 'recovery' ? 0.16
+        : item.reviewKind === 'exit' ? 0.12
+          : item.reviewKind === 'mini' ? 0.23
+            : item.reviewKind === 'challenge' ? 0.20
+              : ['scheduled','practice','hard'].includes(item.reviewKind) ? 0.38
+                : 0.30;
   const updatedScore = correct
     ? Math.min(1, score + (1 - score) * baseGain)
     : almost
@@ -6471,7 +6488,7 @@ function recordOutcome(state, item, outcome, now = new Date(), meta = {}) {
 
   const calculatedDue = schedule[skill].dueAt;
   let phraseDue = calculatedDue;
-  if (correct && item.freeReview) {
+  if (correct && item.freeReview && !item.freeReviewDue) {
     phraseDue = current.dueAt && new Date(current.dueAt) > now ? current.dueAt : calculatedDue;
   } else if (correct && ['mini', 'challenge', 'immediate', 'exit'].includes(item.reviewKind) && current.dueAt) {
     phraseDue = new Date(current.dueAt) < new Date(calculatedDue) ? current.dueAt : calculatedDue;
@@ -6480,7 +6497,7 @@ function recordOutcome(state, item, outcome, now = new Date(), meta = {}) {
 
   // Uma revisão programada conta como um checkpoint da frase. As outras habilidades
   // continuam com memória própria, mas não criam três itens vencidos para a mesma frase.
-  if (!item.freeReview && ['scheduled','practice','hard'].includes(item.reviewKind)) {
+  if ((!item.freeReview || item.freeReviewDue) && ['scheduled','practice','hard'].includes(item.reviewKind)) {
     for (const otherSkill of SKILLS) {
       const other = schedule[otherSkill] || defaultSkillSchedule();
       if (!other.dueAt || new Date(other.dueAt) <= now) other.dueAt = phraseDue;
