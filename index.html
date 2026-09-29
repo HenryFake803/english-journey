@@ -14,7 +14,7 @@
 <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
 
 
-<title>English Journey — V1.2.4</title>
+<title>English Journey — V1.2.5</title>
 <style>
 :root {
   --bg: #08101d;
@@ -112,8 +112,14 @@ h1, h2, h3, p { margin-top: 0; }
 .phrase-row small { color: var(--muted); font-size: 10px; }
 .audio-mini { width: 40px; height: 40px; border-radius: 13px; border: 1px solid var(--line); background: var(--panel-2); }
 .status-dot { width: 9px; height: 9px; border-radius: 99px; background: #637086; }
-.status-dot.learning { background: var(--yellow); }
-.status-dot.strong { background: var(--accent); }
+.status-dot.learning { background:#9aa8ba; }
+.status-dot.strong { background:var(--yellow); box-shadow:0 0 0 4px rgba(255,215,120,.06); }
+.status-dot.mastered { background:var(--accent); box-shadow:0 0 0 4px rgba(113,231,165,.07); }
+.phrase-state-badge { display:inline-flex; align-items:center; gap:6px; margin-top:6px; padding:5px 8px; border-radius:999px; border:1px solid var(--line); background:rgba(255,255,255,.025); font-size:9px; font-weight:900; letter-spacing:.05em; }
+.phrase-state-badge.learning { color:#b7c2d0; }
+.phrase-state-badge.strong { color:var(--yellow); border-color:rgba(255,215,120,.16); background:rgba(255,215,120,.045); }
+.phrase-state-badge.mastered { color:var(--accent); border-color:rgba(113,231,165,.16); background:rgba(113,231,165,.045); }
+.phrase-state-next { display:block; margin-top:5px; color:var(--muted); font-size:9px; line-height:1.35; }
 .stats-hero { padding: 28px; background: linear-gradient(145deg, rgba(113,231,165,.14), var(--panel)); border: 1px solid rgba(113,231,165,.16); border-radius: 27px; display: grid; justify-items: center; }
 .stats-hero strong { font-size: 57px; letter-spacing: -.06em; }
 .stats-hero span { font-weight: 800; }
@@ -476,6 +482,24 @@ button:disabled { cursor:default; }
 .knowledge-state-track i { display:block; height:100%; border-radius:inherit; background:#a7b5c7; }
 .knowledge-state.strong .knowledge-state-track i { background:#ffd778; }
 .knowledge-state.mastered .knowledge-state-track i { background:var(--accent); }
+.knowledge-state-path { display:flex; align-items:center; justify-content:center; gap:8px; margin:13px 0 2px; color:var(--muted); font-size:9px; font-weight:850; }
+.knowledge-state-path b { padding:6px 9px; border-radius:999px; background:rgba(255,255,255,.025); border:1px solid var(--line); color:#d5deea; }
+.knowledge-state-path i { font-style:normal; opacity:.6; }
+.progress-next-card { margin:14px 0; padding:17px; border-radius:21px; background:linear-gradient(145deg, rgba(255,215,120,.045), var(--panel)); border:1px solid rgba(255,215,120,.13); }
+.progress-next-card > header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:11px; }
+.progress-next-card small { color:var(--yellow); font-size:9px; font-weight:900; letter-spacing:.11em; }
+.progress-next-card h2 { margin:4px 0 0; font-size:16px; }
+.progress-next-list { display:grid; gap:8px; }
+.progress-next-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; padding:11px 12px; border-radius:15px; background:rgba(255,255,255,.024); border:1px solid var(--line); }
+.progress-next-row h3 { margin:0 0 3px; font-size:12px; }
+.progress-next-row p { margin:0; color:var(--muted); font-size:9px; line-height:1.4; }
+.progress-next-row > span { font-size:9px; font-weight:900; padding:5px 7px; border-radius:999px; border:1px solid var(--line); white-space:nowrap; }
+.progress-next-row > span.learning { color:#c0cad7; }
+.progress-next-row > span.strong { color:var(--yellow); border-color:rgba(255,215,120,.16); }
+.progress-next-row > span.mastered { color:var(--accent); border-color:rgba(113,231,165,.16); }
+@media (max-width:620px) {
+  .knowledge-state-path { flex-wrap:wrap; }
+}
 .weekly-card { background:linear-gradient(145deg, rgba(113,180,255,.045), var(--panel)); border-color:rgba(113,180,255,.13); }
 .weekly-card > header small { color:#a9d8ff; }
 .trend { flex:0 0 auto; padding:7px 9px; border-radius:999px; font-size:9px; font-weight:850; border:1px solid var(--line); color:var(--muted); background:rgba(255,255,255,.025); }
@@ -2594,7 +2618,7 @@ function familyVariations(pattern) {
   return FAMILY_VARIATIONS[pattern] || [];
 }
 
-const APP_RELEASE = Object.freeze({ version: '1.2.4', channel: 'progression-regression-audit' });
+const APP_RELEASE = Object.freeze({ version: '1.2.5', channel: 'progress-explainability' });
 const KEY = 'english-journey-v061';
 const DEVICE_KEY = `${KEY}-device-id`;
 const SYNC_SCHEMA_VERSION = 1;
@@ -6754,25 +6778,60 @@ function isMastered(progress, now = new Date()) {
   return masteryEvidence(progress, now).passed;
 }
 
+function phraseLearningState(progress, now = new Date()) {
+  const p = progress || {};
+  const evidence = masteryEvidence(p, now);
+  if (evidence.passed) {
+    return {
+      id:'mastered',
+      label:'DOMINADA',
+      explanation:'Memória comprovada em dias diferentes, incluindo produção e listening.',
+      next:'Agora o objetivo é apenas manter essa memória nas revisões futuras.',
+      evidence
+    };
+  }
+
+  const spacedDays = new Set((p.reviewDays || []).filter(isDateKey)).size;
+  const activeSkillCount = SKILLS.filter(skill => Number(p[skill] || 0) > 0).length;
+  const strong = mastery(p) >= 0.58
+    && spacedDays >= 2
+    && activeSkillCount >= 2
+    && !evidence.recurringProduction
+    && !evidence.recurringListening;
+
+  if (strong) {
+    const missing = masteryMissing(p, now, 2);
+    return {
+      id:'strong',
+      label:'FORTE',
+      explanation:'Você já lembrou essa frase em mais de um momento e em mais de uma habilidade.',
+      next:missing.length ? `Para dominar: ${missing.join(' + ')}.` : 'Está perto do domínio; faltam apenas mais provas espaçadas.',
+      evidence
+    };
+  }
+
+  const reasons = [];
+  if (spacedDays < 2) reasons.push('rever em outro dia');
+  if (activeSkillCount < 2) reasons.push('testar outra habilidade');
+  if (mastery(p) < 0.58) reasons.push('firmar a memória');
+  if (evidence.recurringProduction || evidence.recurringListening) reasons.push('resolver uma dificuldade recorrente');
+  return {
+    id:'learning',
+    label:'APRENDENDO',
+    explanation:'A frase ainda está formando memória e precisa de mais evidência antes de ser considerada forte.',
+    next:reasons.length ? `Próximo passo: ${reasons.slice(0,2).join(' + ')}.` : 'Continue seguindo as revisões programadas.',
+    evidence
+  };
+}
+
 function learningBuckets(state, now = new Date()) {
   const seen = allPhrases.filter(phrase => getPhraseProgress(state, phrase.id).seen);
-  let mastered = 0;
-  let strong = 0;
-  let learning = 0;
+  const buckets = { studied:seen.length, learning:0, strong:0, mastered:0 };
   for (const phrase of seen) {
-    const progress = getPhraseProgress(state, phrase.id);
-    if (isMastered(progress, now)) {
-      mastered++;
-      continue;
-    }
-    const spacedDays = new Set(progress.reviewDays || []).size;
-    const activeSkillCount = SKILLS.filter(skill => Number(progress[skill] || 0) > 0).length;
-    const evidence = masteryEvidence(progress, now);
-    const closeToMastery = mastery(progress) >= 0.58 && spacedDays >= 2 && activeSkillCount >= 2 && !evidence.recurringProduction && !evidence.recurringListening;
-    if (closeToMastery) strong++;
-    else learning++;
+    const status = phraseLearningState(getPhraseProgress(state, phrase.id), now);
+    buckets[status.id]++;
   }
-  return { studied: seen.length, learning, strong, mastered };
+  return buckets;
 }
 
 function aggregateHistorySkills(entries = []) {
@@ -6857,7 +6916,7 @@ function coursePhaseProgress(state) {
     const mastered = seen.filter(phrase => isMastered(getPhraseProgress(state, phrase.id))).length;
     const strong = seen.filter(phrase => {
       const progress = getPhraseProgress(state, phrase.id);
-      return !isMastered(progress) && mastery(progress) >= 0.55 && new Set(progress.reviewDays || []).size >= 2;
+      return phraseLearningState(progress).id === 'strong';
     }).length;
     const avgMastery = seen.length
       ? Math.round(seen.reduce((sum, phrase) => sum + mastery(getPhraseProgress(state, phrase.id)), 0) / seen.length * 100)
@@ -7954,12 +8013,17 @@ function libraryView() {
     ${items.length ? `<div class="phrase-list">${items.map(phrase => {
       const p = getPhraseProgress(state, phrase.id);
       const hard = isDifficultPhrase(p);
-      const mastered = isMastered(p);
-      const missing = !hard && !mastered ? masteryMissing(p).join(' + ') : '';
+      const status = phraseLearningState(p);
+      const contactDays = new Set((p.reviewDays || []).filter(isDateKey)).size;
       return `<article class="phrase-row ${hard ? 'hard' : ''}">
         <button type="button" class="audio-mini" data-audio="${phrase.id}" aria-label="Ouvir ${escapeHtml(phrase.english)}">🔊</button>
-        <div><h3>${escapeHtml(phrase.english)}</h3><p>${escapeHtml(phrase.portuguese)}</p><small>${hard ? `⚠ reforço · ${Math.round(difficultyScore(p) * 100)}% dificuldade` : mastered ? `✓ domínio comprovado · ${new Set(p.reviewDays || []).size} dias de contato` : `${Math.round(mastery(p) * 100)}% base · falta ${escapeHtml(missing || 'mais evidência')}`}</small></div>
-        <span class="status-dot ${hard ? 'hard' : mastered ? 'strong' : mastery(p) >= .35 ? 'learning' : ''}"></span>
+        <div>
+          <h3>${escapeHtml(phrase.english)}</h3>
+          <p>${escapeHtml(phrase.portuguese)}</p>
+          <span class="phrase-state-badge ${status.id}">${status.label} · ${Math.round(mastery(p) * 100)}%</span>
+          <small class="phrase-state-next">${hard ? `⚠ Em reforço: houve dificuldade recente. ${escapeHtml(status.next)}` : status.id === 'mastered' ? `✓ ${contactDays} dias de contato · ${escapeHtml(status.next)}` : escapeHtml(status.next)}</small>
+        </div>
+        <span class="status-dot ${hard ? 'hard' : status.id}"></span>
       </article>`;
     }).join('')}</div>` : emptyState('Sua biblioteca ainda está vazia.', 'Conclua o primeiro dia e suas frases aparecerão aqui.')}
   `;
@@ -7992,6 +8056,7 @@ function statsView() {
       <div class="knowledge-ring"><strong>${dashboard.strongOrMasteredRate}%</strong><span>fortes ou<br>dominadas</span></div>
     </section>
     ${knowledgeDistributionCard(buckets)}
+    ${progressNextCard(state)}
     ${weeklyProgressCard(dashboard.week)}
     ${achievementOverviewCard()}
     <section class="dashboard-section">
@@ -8019,11 +8084,36 @@ function statsView() {
 function knowledgeDistributionCard(buckets) {
   const total = Math.max(1, buckets.studied);
   const rows = [
-    ['Aprendendo', buckets.learning, 'Frases ainda dependentes de reforço ou com poucas habilidades testadas.', 'learning'],
-    ['Fortes', buckets.strong, 'Boa memória em mais de um momento, mas ainda sem cumprir toda a regra de domínio.', 'strong'],
-    ['Dominadas', buckets.mastered, 'Memória comprovada em dias diferentes, com produção e listening espaçados.', 'mastered']
+    ['Aprendendo', buckets.learning, 'Memória ainda em formação. Precisa reaparecer em outro dia e ser testada de mais de um jeito.', 'learning'],
+    ['Fortes', buckets.strong, 'Já há boa evidência em dias e habilidades diferentes, mas ainda faltam provas para domínio.', 'strong'],
+    ['Dominadas', buckets.mastered, 'A frase sobreviveu ao tempo, à produção e ao listening. Agora entra em manutenção.', 'mastered']
   ];
-  return `<section class="knowledge-distribution"><header><div><small>ESTADO DAS FRASES</small><h2>${buckets.studied ? 'Nem toda frase vista é uma frase aprendida.' : 'Seu mapa de conhecimento começa no primeiro estudo.'}</h2></div><span>${buckets.studied} vistas</span></header><div class="knowledge-state-list">${rows.map(([label, value, text, cls]) => `<div class="knowledge-state ${cls}"><div class="knowledge-state-head"><b>${label}</b><strong>${value}</strong></div><p>${text}</p><div class="knowledge-state-track"><i style="width:${Math.round(value / total * 100)}%"></i></div></div>`).join('')}</div></section>`;
+  return `<section class="knowledge-distribution"><header><div><small>ESTADO DAS FRASES</small><h2>${buckets.studied ? 'Cada estado representa evidência real de memória.' : 'Seu mapa de conhecimento começa no primeiro estudo.'}</h2></div><span>${buckets.studied} vistas</span></header><div class="knowledge-state-list">${rows.map(([label, value, text, cls]) => `<div class="knowledge-state ${cls}"><div class="knowledge-state-head"><b>${label}</b><strong>${value}</strong></div><p>${text}</p><div class="knowledge-state-track"><i style="width:${Math.round(value / total * 100)}%"></i></div></div>`).join('')}</div>${buckets.studied ? '<div class="knowledge-state-path"><b>APRENDENDO</b><i>→</i><b>FORTE</b><i>→</i><b>DOMINADA</b></div>' : ''}</section>`;
+}
+
+function closestProgressPhrases(appState, now = new Date(), limit = 4) {
+  return allPhrases
+    .filter(phrase => getPhraseProgress(appState, phrase.id).seen)
+    .map(phrase => {
+      const progress = getPhraseProgress(appState, phrase.id);
+      const status = phraseLearningState(progress, now);
+      const evidence = status.evidence;
+      let score = mastery(progress) * 100;
+      if (status.id === 'learning') score += Math.min(12, new Set(progress.reviewDays || []).size * 3);
+      if (status.id === 'strong') score += 30;
+      if (status.id === 'mastered') score = -1;
+      if (isDifficultPhrase(progress)) score -= 18;
+      return { phrase, progress, status, evidence, score };
+    })
+    .filter(item => item.status.id !== 'mastered')
+    .sort((a,b) => b.score - a.score)
+    .slice(0, limit);
+}
+
+function progressNextCard(appState, now = new Date()) {
+  const items = closestProgressPhrases(appState, now, 4);
+  if (!items.length) return '';
+  return `<section class="progress-next-card"><header><div><small>PRÓXIMAS A AVANÇAR</small><h2>O que falta para algumas frases subirem de estado</h2></div></header><div class="progress-next-list">${items.map(({phrase,status}) => `<div class="progress-next-row"><div><h3>${escapeHtml(phrase.english)}</h3><p>${escapeHtml(status.next)}</p></div><span class="${status.id}">${status.label}</span></div>`).join('')}</div></section>`;
 }
 
 function weeklyProgressCard(week) {
