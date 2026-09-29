@@ -14,7 +14,7 @@
 <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
 
 
-<title>English Journey — V1.1.4</title>
+<title>English Journey — V1.1.5</title>
 <style>
 :root {
   --bg: #08101d;
@@ -895,6 +895,29 @@ button:focus-visible,.choice:focus-visible,summary:focus-visible{outline:2px sol
 /* V1.1.4 — instalação PWA + proteção de persistência */
 .pwa-install-card{overflow:hidden}.pwa-install-head{display:flex;align-items:center;gap:13px}.pwa-app-badge{width:50px;height:50px;border-radius:16px;display:grid;place-items:center;flex:0 0 auto;background:linear-gradient(145deg,var(--accent),var(--accent-2));color:#07140d;font-size:18px;font-weight:950;letter-spacing:-.08em;box-shadow:0 12px 28px rgba(113,231,165,.14)}.pwa-install-head>div{min-width:0}.pwa-install-head h3{margin:3px 0 5px}.pwa-install-head p{margin:0}.pwa-install-card .primary,.pwa-install-card .ghost{margin-top:15px}.pwa-status-line{margin-top:12px;color:var(--muted);font-size:11px;line-height:1.45}@media(display-mode:standalone){.pwa-install-card .install-only{display:none}}
 
+
+/* V1.1.5 — segurança do progresso */
+.progress-safety-card { border-color: rgba(113,231,165,.2); background: linear-gradient(145deg, rgba(113,231,165,.07), var(--panel)); }
+.progress-safety-head { display:flex; align-items:flex-start; gap:12px; }
+.progress-safety-icon { width:44px; height:44px; flex:0 0 auto; display:grid; place-items:center; border-radius:14px; background:rgba(113,231,165,.12); color:var(--accent); font-weight:950; }
+.progress-safety-head h3 { margin:3px 0 4px; }
+.progress-safety-head p { margin:0; color:var(--muted); font-size:12px; line-height:1.45; }
+.safety-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:14px 0; }
+.safety-grid div { padding:12px 8px; border:1px solid var(--line); border-radius:14px; background:rgba(8,16,29,.35); text-align:center; display:grid; gap:3px; }
+.safety-grid small { color:var(--muted); font-size:9px; letter-spacing:.06em; }
+.safety-grid b { font-size:12px; }
+.checkpoint-list { display:grid; gap:9px; margin-top:12px; }
+.checkpoint-row { padding:13px; border:1px solid var(--line); border-radius:15px; background:rgba(8,16,29,.32); display:grid; grid-template-columns:1fr auto; gap:9px 12px; align-items:center; }
+.checkpoint-row h4 { margin:0 0 3px; font-size:13px; }
+.checkpoint-row p { margin:0; color:var(--muted); font-size:10px; line-height:1.4; }
+.checkpoint-row button { grid-row:1 / span 2; grid-column:2; white-space:nowrap; padding:9px 11px; border-radius:12px; border:1px solid var(--line); background:var(--panel-2); font-size:10px; font-weight:900; }
+.checkpoint-empty { color:var(--muted); font-size:12px; line-height:1.45; }
+.app-update-banner { position:sticky; top:8px; z-index:35; display:flex; align-items:center; gap:11px; padding:12px 13px; margin:0 0 10px; border:1px solid rgba(113,231,165,.28); border-radius:16px; background:rgba(12,27,38,.96); box-shadow:var(--shadow); }
+.app-update-banner div { flex:1; min-width:0; }
+.app-update-banner small { color:var(--accent); font-size:9px; letter-spacing:.12em; font-weight:900; }
+.app-update-banner b { display:block; margin-top:2px; font-size:12px; }
+.app-update-banner button { border:0; border-radius:12px; background:var(--accent); color:#07140d; font-weight:900; font-size:10px; padding:10px 12px; }
+@media (max-width:430px){ .safety-grid{grid-template-columns:1fr;} .checkpoint-row{grid-template-columns:1fr;} .checkpoint-row button{grid-column:1;grid-row:auto;width:100%;} }
 </style>
 </head>
 <body>
@@ -2547,7 +2570,7 @@ function familyVariations(pattern) {
   return FAMILY_VARIATIONS[pattern] || [];
 }
 
-const APP_RELEASE = Object.freeze({ version: '1.1.4', channel: 'pwa-persistence-hotfix' });
+const APP_RELEASE = Object.freeze({ version: '1.1.5', channel: 'progress-safety' });
 const KEY = 'english-journey-v061';
 const DEVICE_KEY = `${KEY}-device-id`;
 const SYNC_SCHEMA_VERSION = 1;
@@ -2617,9 +2640,9 @@ let cloudRuntime = {
 };
 
 
-// V1.1.4 — PWA instalável. Em file:// o curso continua funcionando no modo local.
+// V1.1.5 — PWA instalável com atualização explícita e proteção de progresso.
 let deferredInstallPrompt = null;
-let pwaRuntime = { installed: false, serviceWorker: 'idle', message: null, error: null };
+let pwaRuntime = { installed: false, serviceWorker: 'idle', message: null, error: null, updateAvailable: false, registration: null, refreshing: false };
 
 function isStandaloneMode() {
   try { return window.matchMedia?.('(display-mode: standalone)')?.matches === true || window.navigator?.standalone === true; }
@@ -2668,13 +2691,45 @@ async function promptInstallEnglishJourney() {
   }
   renderAccountIfOpen();
 }
+function markPwaUpdateAvailable(registration) {
+  if (!registration?.waiting || !navigator.serviceWorker?.controller) return;
+  pwaRuntime.updateAvailable = true;
+  pwaRuntime.registration = registration;
+  pwaRuntime.message = 'Nova versão pronta para aplicar.';
+  try { render(); } catch {}
+}
+async function activatePwaUpdate() {
+  const registration = pwaRuntime.registration || await navigator.serviceWorker?.getRegistration?.('./');
+  if (!registration?.waiting) {
+    pwaRuntime.updateAvailable = false;
+    pwaRuntime.message = 'Você já está usando a versão mais recente disponível.';
+    render();
+    return;
+  }
+  pwaRuntime.refreshing = true;
+  registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+}
 async function registerEnglishJourneyPwa() {
   pwaRuntime.installed = isStandaloneMode();
   if (!('serviceWorker' in navigator)) { pwaRuntime.serviceWorker = 'unsupported'; return; }
   if (!pwaSecureContext()) { pwaRuntime.serviceWorker = 'needs-https'; return; }
   try {
     const registration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+    pwaRuntime.registration = registration;
     pwaRuntime.serviceWorker = 'ready';
+    if (registration.waiting) markPwaUpdateAvailable(registration);
+    registration.addEventListener('updatefound', () => {
+      const worker = registration.installing;
+      if (!worker) return;
+      worker.addEventListener('statechange', () => {
+        if (worker.state === 'installed' && navigator.serviceWorker.controller) markPwaUpdateAvailable(registration);
+      });
+    });
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!pwaRuntime.refreshing) return;
+      pwaRuntime.refreshing = false;
+      location.reload();
+    });
     registration.update().catch(() => {});
     renderAccountIfOpen();
   } catch {
@@ -3396,6 +3451,8 @@ window.addEventListener('offline', () => {
 
 const BACKUP_KEY = `${KEY}-backup`;
 const COMPLETION_GUARD_KEY = `${KEY}-completion-guard`;
+const CHECKPOINT_HISTORY_KEY = `${KEY}-checkpoint-history-v1`;
+const CHECKPOINT_HISTORY_LIMIT = 5;
 const LEGACY_KEYS = ['english-journey-v06', 'english-journey-v05', 'english-journey-v043', 'english-journey-v04', 'english-journey-v02', 'english-journey-v01'];
 const WINDOW_NAME_PREFIX = '__ENGLISH_JOURNEY_V061__:';
 let memorySnapshot = null;
@@ -8509,7 +8566,7 @@ function escapeHtml(text) {
 }
 function capitalize(v) { return v.charAt(0).toUpperCase() + v.slice(1); }
 
-// V1.1.4 — API interna de sincronização + camada PWA instalável + diagnóstico de persistência.
+// V1.1.5 — API interna de sincronização + histórico restaurável + diagnóstico de persistência.
 window.EnglishJourneySync = Object.freeze({
   schemaVersion: SYNC_SCHEMA_VERSION,
   deviceId: CURRENT_DEVICE_ID,
