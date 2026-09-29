@@ -14,7 +14,7 @@
 <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
 
 
-<title>English Journey — V1.2.5</title>
+<title>English Journey — V1.2.6</title>
 <style>
 :root {
   --bg: #08101d;
@@ -559,9 +559,23 @@ button:disabled { cursor:default; }
 .today-card-head span { color:#d9e4ef; font-size:11px; font-weight:800; }
 .today-card h1 { margin:10px 0 8px; font-size:clamp(32px,7vw,48px); letter-spacing:-.05em; line-height:1.02; }
 .today-card > p { max-width:570px; margin:0; color:#b9c7d7; line-height:1.5; font-size:13px; }
-.today-plan { display:flex; flex-wrap:wrap; gap:8px; margin:20px 0 14px; }
-.today-plan span { display:inline-flex; align-items:baseline; gap:5px; padding:8px 11px; border-radius:999px; background:rgba(255,255,255,.045); border:1px solid var(--line); color:var(--muted); font-size:10px; }
-.today-plan b { color:#eef6ff; font-size:14px; }
+.today-answer { margin:19px 0 12px; padding:15px 16px; border-radius:18px; background:rgba(7,18,29,.32); border:1px solid rgba(113,231,165,.14); }
+.today-answer small { display:block; color:var(--accent); font-size:9px; letter-spacing:.11em; font-weight:900; margin-bottom:5px; }
+.today-answer strong { display:block; color:#eef7ff; font-size:17px; line-height:1.25; }
+.today-answer p { margin:5px 0 0; color:var(--muted); font-size:10px; line-height:1.45; }
+.today-plan { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:0 0 14px; }
+.today-plan span { display:grid; gap:2px; min-width:0; padding:11px 12px; border-radius:15px; background:rgba(255,255,255,.04); border:1px solid var(--line); color:var(--muted); font-size:9px; }
+.today-plan span small { color:var(--muted); font-size:8px; letter-spacing:.08em; font-weight:850; text-transform:uppercase; }
+.today-plan b { color:#eef6ff; font-size:18px; line-height:1.05; }
+.today-plan em { color:#b9c7d7; font-size:8px; font-style:normal; line-height:1.25; }
+.today-plan .due b { color:#a9d8ff; }
+.today-plan .new b { color:var(--accent); }
+.today-plan .time b { color:var(--yellow); }
+@media (max-width:520px) {
+  .today-plan { grid-template-columns:repeat(3,1fr); gap:6px; }
+  .today-plan span { padding:10px 8px; }
+  .today-plan b { font-size:16px; }
+}
 .today-cta { margin-top:2px; }
 .today-progress { display:grid; gap:7px; margin-top:17px; padding-top:15px; border-top:1px solid var(--line); }
 .today-progress > div:first-child { display:flex; justify-content:space-between; align-items:center; color:#dce6f0; font-size:11px; font-weight:800; }
@@ -2618,7 +2632,7 @@ function familyVariations(pattern) {
   return FAMILY_VARIATIONS[pattern] || [];
 }
 
-const APP_RELEASE = Object.freeze({ version: '1.2.5', channel: 'progress-explainability' });
+const APP_RELEASE = Object.freeze({ version: '1.2.6', channel: 'daily-study-clarity' });
 const KEY = 'english-journey-v061';
 const DEVICE_KEY = `${KEY}-device-id`;
 const SYNC_SCHEMA_VERSION = 1;
@@ -7722,6 +7736,39 @@ function accountView() {
   </div>`;
 }
 
+function dailyStudyBrief(plan, options = {}) {
+  const completedAll = Boolean(options.completedAll);
+  const activeSession = options.activeSession || null;
+  const reviewCount = activeSession ? Number(activeSession.reviewCount || 0) : Number(plan?.reviewCount || 0);
+  const newCount = activeSession ? Number(activeSession.newCount || 0) : Number(plan?.newGoal || 0);
+  const totalDue = Number(plan?.due || 0);
+  const minutes = activeSession
+    ? Number(activeSession.estimatedMinutes || Math.max(5, Math.round(newCount * .42 + reviewCount * .16)))
+    : Number(plan?.estimatedMinutes || 0);
+
+  let title = 'Avance com novas frases';
+  if (completedAll) title = reviewCount ? 'Mantenha suas frases vivas' : 'Faça uma revisão curta';
+  else if (plan?.mode === 'consolidation') title = 'Hoje é dia de consolidar';
+  else if (plan?.mode === 'recovery') title = 'Recupere o ritmo antes de avançar';
+  else if (plan?.mode === 'catchup') title = 'Equilibre revisões e frases novas';
+  else if (plan?.dailyCapReached) title = reviewCount ? 'A meta de novas já foi concluída' : 'A tarefa principal de hoje está concluída';
+  else if (reviewCount && newCount) title = 'Revise primeiro, depois avance';
+  else if (reviewCount) title = 'Comece pelas revisões';
+  else if (!newCount) title = 'Mantenha o que você já aprendeu';
+
+  let sequence = '';
+  if (reviewCount && newCount) sequence = `Primeiro ${reviewCount} ${reviewCount === 1 ? 'revisão' : 'revisões'} prioritárias; depois até ${newCount} ${newCount === 1 ? 'frase nova' : 'frases novas'}.`;
+  else if (reviewCount) sequence = `${reviewCount} ${reviewCount === 1 ? 'revisão entra' : 'revisões entram'} nesta sessão. Nenhuma frase nova precisa ser adicionada agora.`;
+  else if (newCount) sequence = `Sua memória está em dia para avançar com até ${newCount} ${newCount === 1 ? 'frase nova' : 'frases novas'}.`;
+  else sequence = 'Não há uma carga obrigatória nova agora. Você pode manter a memória com uma revisão curta.';
+
+  if (!activeSession && totalDue > reviewCount && reviewCount > 0) {
+    sequence += ` Existem ${totalDue} revisões vencidas no total; esta sessão pega as ${reviewCount} mais importantes primeiro.`;
+  }
+
+  return { title, sequence, reviewCount, newCount, totalDue, minutes };
+}
+
 function postTaskReviewCard(state, now = new Date(), hasSession = false) {
   if (!primarySessionCompletedToday(state, now)) return '';
   const activeFree = state.activeSession?.mode === 'free-review';
@@ -7770,9 +7817,10 @@ function homeView() {
     : plan.estimatedMinutes;
   const focusTitle = s.difficult ? `${s.difficult} ${s.difficult === 1 ? 'frase precisa' : 'frases precisam'} de reforço` : focusMessage(s);
   const focusText = s.difficult
-    ? 'O treino normal já vai puxar essas frases no momento certo. Se quiser, você também pode fazer um reforço curto agora.'
+    ? 'A sessão de hoje já vai incluir essas frases quando forem prioridade. O reforço curto continua opcional.'
     : focusSubtext(s);
   const continuity = !hasSession ? activeNextSessionBrief(state, now) : null;
+  const dailyBrief = dailyStudyBrief(plan, { completedAll, activeSession: hasSession ? state.activeSession : null });
 
   return `
     <header class="topbar"><div class="brand-mark">E</div><div><b>English Journey</b><span>frases úteis · revisão inteligente</span></div><div class="xp-pill">${state.xp} XP</div>${accountTopButton()}</header>
@@ -7785,10 +7833,11 @@ function homeView() {
       <div class="today-card-head"><div><small>${completedAll ? 'CURSO BASE CONCLUÍDO' : `FASE ${phaseForDay(day.id)?.id || 5} · DIA ${day.id} DE 30`}</small><span>${s.streak ? `🔥 ${s.streak} ${s.streak === 1 ? 'dia' : 'dias'}` : 'Comece sua sequência'}</span></div></div>
       <h1>${completedAll ? 'Consolidar o que já é seu.' : day.title}</h1>
       <p>${completedAll ? 'As 1.200 frases já entraram no ciclo. Agora o foco é retenção, listening e produção.' : day.subtitle}</p>
+      <div class="today-answer"><small>O QUE FAZER AGORA</small><strong>${escapeHtml(dailyBrief.title)}</strong><p>${escapeHtml(dailyBrief.sequence)}</p></div>
       <div class="today-plan">
-        <span><b>${sessionNew}</b> novas</span>
-        <span><b>${hasSession ? Number(state.activeSession.reviewCount || 0) : plan.reviewCount}</b> revisões</span>
-        <span><b>~${sessionMinutes}</b> min</span>
+        <span class="due"><small>REVISÕES</small><b>${dailyBrief.reviewCount}</b><em>${dailyBrief.totalDue > dailyBrief.reviewCount && !hasSession ? `de ${dailyBrief.totalDue} vencidas` : 'prioridade agora'}</em></span>
+        <span class="new"><small>NOVAS</small><b>${dailyBrief.newCount}</b><em>${dailyBrief.newCount ? 'entram hoje' : 'nenhuma agora'}</em></span>
+        <span class="time"><small>TEMPO</small><b>~${dailyBrief.minutes}</b><em>minutos estimados</em></span>
       </div>
       ${canStartSession
         ? `<button class="primary big today-cta" data-start="${day.id}">${hasFinishedSession ? 'VER RESUMO DA SESSÃO' : hasActive ? sessionResumeLabel(state.activeSession) : completedAll ? 'TREINAR AGORA' : plan.mode === 'recovery' ? 'COMEÇAR RETOMADA' : plan.mode === 'daily-complete' ? 'REVISAR O QUE JÁ APRENDEU' : 'COMEÇAR SESSÃO'}</button>`
@@ -7896,10 +7945,11 @@ function todayGuidance(plan, continuity) {
   const load = plan?.dailyCapReached ? `${plan.newIntroducedToday}/${plan.dailyNewCap} novas hoje` : plan?.newGoal === 0 ? 'sem novas' : `até ${plan?.newGoal ?? 0} novas`;
   const details = [
     plan?.reviewCount != null ? `${plan.reviewCount} revisões previstas` : null,
-    plan?.hardCount ? `${plan.hardCount} difíceis` : null,
+    plan?.due > plan?.reviewCount ? `${plan.due} revisões vencidas no total` : null,
+    plan?.hardCount ? `${plan.hardCount} frases em reforço` : null,
     plan?.loadLabel ? `ritmo: ${String(plan.loadLabel).toLowerCase()}` : null
   ].filter(Boolean).join(' · ');
-  return `<section class="today-guidance ${escapeHtml(cls)}"><div class="today-guidance-head"><span>${icon}</span><div><small>PRÓXIMO PASSO</small><b>${escapeHtml(title)}</b></div><em>${escapeHtml(load)}</em></div><p>${escapeHtml(reason)}</p>${details ? `<details class="today-plan-details"><summary>Como o plano foi montado</summary><p>${escapeHtml(details)}. A carga pode mudar durante a sessão se sua retenção pedir.</p></details>` : ''}</section>`;
+  return `<section class="today-guidance ${escapeHtml(cls)}"><div class="today-guidance-head"><span>${icon}</span><div><small>POR QUE ESTE PLANO?</small><b>${escapeHtml(title)}</b></div><em>${escapeHtml(load)}</em></div><p>${escapeHtml(reason)}</p>${details ? `<details class="today-plan-details"><summary>Ver detalhes</summary><p>${escapeHtml(details)}. O app pode ajustar a carga durante a sessão se seu desempenho pedir.</p></details>` : ''}</section>`;
 }
 
 function recoveryBanner(plan, calendar) {
