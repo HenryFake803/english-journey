@@ -3117,6 +3117,7 @@ async function updateCloudEnvelope(envelope, expectedRevision) {
 function applyRemoteEnvelope(envelope, reason = 'cloud-restore') {
   const restored = stateFromSyncEnvelope(envelope);
   if (!restored) throw new Error('Não foi possível validar o progresso da nuvem.');
+  if (hasMeaningfulProgress(state)) saveProgressCheckpoint('before-cloud-restore', state);
   restored.syncMeta.ownerUserId = cloudRuntime.user?.id || null;
   state = restored;
   restoreTransientSessionUi();
@@ -3271,6 +3272,12 @@ async function reconcileWithCloud(trigger = 'manual') {
         return true;
       }
       if (relation === 'remote-newer') {
+        const restoredRemote = stateFromSyncEnvelope(remote);
+        if (restoredRemote && progressWouldRegress(restoredRemote, state)) {
+          cloudRuntime.conflict = { type: 'remote-regression', remote };
+          cloudRuntime.status = 'pending';
+          return false;
+        }
         applyRemoteEnvelope(remote, 'cloud-newer');
         return true;
       }
@@ -3500,6 +3507,118 @@ function progressEvidence(value) {
   return { completedDays, seenPhrases, historyEntries, xp, activeIndex };
 }
 
+function progressWouldRegress(candidate, current) {
+  if (!hasMeaningfulProgress(current)) return false;
+  const incoming = progressEvidence(candidate);
+  const existing = progressEvidence(current);
+  return incoming.completedDays < existing.completedDays
+    || incoming.seenPhrases < existing.seenPhrases
+    || incoming.historyEntries < existing.historyEntries
+    || incoming.xp < existing.xp;
+}
+
+function checkpointReasonLabel(reason) {
+  return ({
+    'day-complete':'Dia concluído',
+    'session-pause':'Sessão pausada',
+    'before-cloud-restore':'Antes de carregar a nuvem',
+    'manual':'Ponto criado manualmente',
+    'history-restore':'Restauração anterior'
+  })[reason] || 'Ponto seguro';
+}
+
+function readProgressCheckpoints() {
+  let best = [];
+  for (const kind of ['localStorage','sessionStorage']) {
+    try {
+      const raw = window[kind]?.getItem(CHECKPOINT_HISTORY_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed) && parsed.length > best.length) best = parsed;
+    } catch {}
+  }
+  return best.filter(entry => entry && typeof entry.id === 'string' && entry.state && typeof entry.state === 'object')
+    .sort((a,b) => new Date(b.at || 0) - new Date(a.at || 0))
+    .slice(0, CHECKPOINT_HISTORY_LIMIT);
+}
+
+function persistProgressCheckpoints(entries) {
+  const original = Array.isArray(entries) ? entries.slice(0, CHECKPOINT_HISTORY_LIMIT) : [];
+  let any = false;
+  for (const kind of ['localStorage','sessionStorage']) {
+    let list = [...original];
+    while (list.length) {
+      try {
+        const storage = window[kind];
+        if (!storage) break;
+        storage.setItem(CHECKPOINT_HISTORY_KEY, JSON.stringify(list));
+        any = true;
+        break;
+      } catch {
+        list = list.slice(0, -1);
+      }
+    }
+  }
+  return any;
+}
+
+function saveProgressCheckpoint(reason = 'manual', target = state) {
+  if (!target || typeof target !== 'object' || !hasMeaningfulProgress(target)) return false;
+  const history = readProgressCheckpoints();
+  const fingerprint = syncFingerprint(target);
+  if (history[0]?.fingerprint === fingerprint) return true;
+  const payload = syncPayload(target);
+  const entry = {
+    id: randomId('ej-checkpoint'),
+    at: new Date().toISOString(),
+    reason,
+    appVersion: APP_RELEASE.version,
+    fingerprint,
+    summary: progressEvidence(payload),
+    state: payload
+  };
+  return persistProgressCheckpoints([entry, ...history]);
+}
+
+function restoreProgressCheckpoint(id) {
+  const entry = readProgressCheckpoints().find(item => item.id === id);
+  if (!entry) return false;
+  const currentMeta = sanitizeSyncMeta(state?.syncMeta, state?._persistedAt);
+  const restored = upgradeState(entry.state, { resetSession: false });
+  const now = new Date().toISOString();
+  restored.syncMeta = newSyncMeta({
+    lineageId: currentMeta.lineageId,
+    revision: Math.max(Number(currentMeta.revision || 0), Number(currentMeta.lastSyncedRevision || 0)) + 1,
+    updatedAt: now,
+    lastMutationAt: now,
+    lastMutationReason: 'history-restore',
+    lastModifiedByDeviceId: CURRENT_DEVICE_ID,
+    lastSyncedRevision: Number(currentMeta.lastSyncedRevision || 0),
+    lastSyncedAt: currentMeta.lastSyncedAt || null,
+    lastSyncedDeviceId: currentMeta.lastSyncedDeviceId || null,
+    ownerUserId: currentMeta.ownerUserId || null,
+    dirty: true,
+    status: currentMeta.lastSyncedRevision ? 'pending' : 'local-only'
+  });
+  restored.syncMeta.fingerprint = syncFingerprint(restored);
+
+  for (const kind of ['localStorage','sessionStorage']) {
+    safeRemove(kind, KEY);
+    safeRemove(kind, BACKUP_KEY);
+    safeRemove(kind, COMPLETION_GUARD_KEY);
+  }
+  clearWindowName();
+  state = restored;
+  restoreTransientSessionUi();
+  saveState(state, 'history-restore');
+  persistCompletionGuard(state);
+  persistenceRecoveryNotice = 'Um ponto seguro anterior foi restaurado por você.';
+  if (cloudRuntime.user) {
+    cloudRuntime.message = 'Checkpoint restaurado. A alteração será sincronizada como uma nova revisão.';
+    scheduleCloudSync('history-restore');
+  }
+  return true;
+}
+
 function comparePersistenceCandidates(a, b) {
   const ae = progressEvidence(a?.parsed);
   const be = progressEvidence(b?.parsed);
@@ -3666,6 +3785,8 @@ function resetState() {
   safeRemove('sessionStorage', BACKUP_KEY);
   safeRemove('localStorage', COMPLETION_GUARD_KEY);
   safeRemove('sessionStorage', COMPLETION_GUARD_KEY);
+  safeRemove('localStorage', CHECKPOINT_HISTORY_KEY);
+  safeRemove('sessionStorage', CHECKPOINT_HISTORY_KEY);
   for (const legacyKey of LEGACY_KEYS) {
     safeRemove('localStorage', legacyKey);
     safeRemove('sessionStorage', legacyKey);
@@ -7096,6 +7217,7 @@ function shell(body) {
     <main class="app-shell ${inLesson ? 'lesson-shell' : ''}">
       <div class="sr-only" aria-live="polite" aria-atomic="true">${interactionError ? escapeHtml(interactionError) : ''}</div>
       ${!RELEASE_INTEGRITY.ok ? `<section class="integrity-banner" role="alert"><span>!</span><div><small>INTEGRIDADE DO CURSO</small><h3>Esta cópia precisa ser substituída.</h3><p>O progresso salvo foi mantido, mas novas sessões estão bloqueadas para não registrar dados sobre um conteúdo incompleto.</p></div></section>` : ''}
+      ${pwaRuntime.updateAvailable ? `<section class="app-update-banner"><div><small>NOVA VERSÃO DISPONÍVEL</small><b>Atualização pronta sem reinstalar o app.</b></div><button type="button" data-pwa-update>ATUALIZAR AGORA</button></section>` : ''}
       <section class="content">${body}</section>
       ${inLesson || onboarding ? '' : nav()}
     </main>
@@ -7162,10 +7284,11 @@ function accountConflictCard() {
   const remote = cloudStateSummary(conflict.remote);
   const initial = conflict.type === 'initial-upload' && !conflict.remote;
   const foreign = conflict.type === 'foreign-local';
+  const regression = conflict.type === 'remote-regression';
   return `<section class="account-card cloud-conflict">
-    <small>${initial ? 'PRIMEIRA SINCRONIZAÇÃO' : foreign ? 'PROGRESSO DE OUTRA CONTA' : 'CONFLITO DE PROGRESSO'}</small>
-    <h2>${initial ? 'Levar este progresso para sua conta?' : foreign ? 'Este dispositivo já possui um progresso vinculado.' : 'Existem duas versões diferentes.'}</h2>
-    <p>${initial ? 'Sua conta ainda não tem um save na nuvem. Confirme para usar o progresso deste dispositivo como ponto inicial.' : foreign ? 'Para evitar enviar o progresso de outra pessoa para esta conta, o English Journey não faz nenhuma troca automática.' : 'Nenhuma versão será sobrescrita silenciosamente. Compare os dados e escolha qual deve continuar.'}</p>
+    <small>${initial ? 'PRIMEIRA SINCRONIZAÇÃO' : foreign ? 'PROGRESSO DE OUTRA CONTA' : regression ? 'PROTEÇÃO CONTRA PERDA' : 'CONFLITO DE PROGRESSO'}</small>
+    <h2>${initial ? 'Levar este progresso para sua conta?' : foreign ? 'Este dispositivo já possui um progresso vinculado.' : regression ? 'A nuvem tem uma revisão mais nova, mas menos progresso.' : 'Existem duas versões diferentes.'}</h2>
+    <p>${initial ? 'Sua conta ainda não tem um save na nuvem. Confirme para usar o progresso deste dispositivo como ponto inicial.' : foreign ? 'Para evitar enviar o progresso de outra pessoa para esta conta, o English Journey não faz nenhuma troca automática.' : regression ? 'O English Journey bloqueou a troca automática. Compare as duas versões e escolha conscientemente qual deve continuar.' : 'Nenhuma versão será sobrescrita silenciosamente. Compare os dados e escolha qual deve continuar.'}</p>
     <div class="cloud-compare">
       <div class="cloud-version"><b>ESTE DISPOSITIVO</b><strong>${local.xp} XP</strong><span>${local.days}/30 dias concluídos</span><span>${local.phrases} frases vistas</span><span>revisão ${local.revision} · ${formatCloudDate(local.updatedAt)}</span></div>
       ${conflict.remote ? `<div class="cloud-version"><b>NUVEM</b><strong>${remote.xp} XP</strong><span>${remote.days}/30 dias concluídos</span><span>${remote.phrases} frases vistas</span><span>revisão ${remote.revision} · ${formatCloudDate(remote.updatedAt)}</span></div>` : `<div class="cloud-version"><b>NUVEM</b><strong>Vazia</strong><span>Nenhum progresso salvo ainda.</span></div>`}
@@ -7175,6 +7298,29 @@ function accountConflictCard() {
       ${conflict.remote ? `<button type="button" class="ghost" data-cloud-use-remote>USAR PROGRESSO DA NUVEM</button>` : ''}
     </div>
   </section>`;
+}
+
+function persistenceSafetyCard() {
+  const history = readProgressCheckpoints();
+  const mode = getStorageMode();
+  const localOk = mode !== 'memory' && persistenceSaveFailures === 0;
+  const guard = Boolean(safeGet('localStorage', COMPLETION_GUARD_KEY) || safeGet('sessionStorage', COMPLETION_GUARD_KEY));
+  const last = state?._persistedAt ? formatCloudDate(state._persistedAt) : '—';
+  const cloudLabel = !cloudRuntime.configured ? 'não configurada' : !cloudRuntime.user ? 'sem login' : cloudRuntime.status === 'synced' && !state.syncMeta?.dirty ? 'sincronizada' : navigator.onLine === false ? 'offline' : 'pendente';
+  return `<section class="account-card progress-safety-card">
+    <div class="progress-safety-head"><div class="progress-safety-icon">${localOk ? '✓' : '!'}</div><div><small>SEGURANÇA DO PROGRESSO</small><h3>${localOk ? 'Progresso protegido neste dispositivo.' : 'O armazenamento local precisa de atenção.'}</h3><p>${localOk ? 'O curso mantém save principal, backup e pontos seguros restauráveis.' : 'Continue com o app aberto e evite limpar os dados do navegador até o armazenamento voltar ao normal.'}</p></div></div>
+    <div class="safety-grid"><div><small>ÚLTIMO SAVE</small><b>${escapeHtml(last)}</b></div><div><small>PROTEÇÃO</small><b>${guard ? 'checkpoint ativo' : history.length ? 'histórico ativo' : 'preparando'}</b></div><div><small>NUVEM</small><b>${escapeHtml(cloudLabel)}</b></div></div>
+    <button type="button" class="ghost full" data-create-checkpoint>CRIAR PONTO SEGURO AGORA</button>
+  </section>`;
+}
+
+function checkpointHistoryCard() {
+  const history = readProgressCheckpoints();
+  const rows = history.map(entry => {
+    const summary = entry.summary || progressEvidence(entry.state);
+    return `<div class="checkpoint-row"><div><h4>${escapeHtml(checkpointReasonLabel(entry.reason))}</h4><p>${escapeHtml(formatCloudDate(entry.at))} · ${Number(summary.completedDays || 0)}/30 dias · ${Number(summary.seenPhrases || 0)} frases · ${Number(summary.xp || 0)} XP</p></div><button type="button" data-restore-checkpoint="${escapeHtml(entry.id)}">RESTAURAR</button></div>`;
+  }).join('');
+  return `<details class="account-card checkpoint-history-card" ${history.length ? '' : 'open'}><summary>Histórico de segurança · ${history.length}/${CHECKPOINT_HISTORY_LIMIT}</summary>${history.length ? `<div class="checkpoint-list">${rows}</div><p class="cloud-config-note">Restaurar cria uma nova revisão; não apaga os checkpoints anteriores.</p>` : `<p class="checkpoint-empty">Os pontos seguros aparecem ao concluir ou pausar sessões. Você também pode criar um manual acima.</p>`}</details>`;
 }
 
 function pwaInstallCard() {
@@ -7199,6 +7345,8 @@ function accountView() {
     ? `<div class="account-message error" role="alert">${escapeHtml(cloudRuntime.error)}</div>`
     : cloudRuntime.message ? `<div class="account-message">${escapeHtml(cloudRuntime.message)}</div>` : '';
   const pwaCard = pwaInstallCard();
+  const safetyCard = persistenceSafetyCard();
+  const historyCard = checkpointHistoryCard();
 
   if (!configured) {
     return `<div class="account-page">
@@ -7214,6 +7362,12 @@ function accountView() {
         <p class="cloud-config-note">Use somente a chave pública/publishable do projeto. Nunca cole uma <b>service_role</b> no navegador.</p>
       </section>
       <section class="account-card"><small>MODO ATUAL</small><h3>Seu progresso segue protegido localmente.</h3><p>Device ID: ${escapeHtml(CURRENT_DEVICE_ID.slice(-14))} · revisão local ${Number(state.syncMeta?.revision || 0)}.</p></section>
+      ${safetyCard}
+      ${historyCard}
+      ${safetyCard}
+      ${historyCard}
+      ${safetyCard}
+      ${historyCard}
       ${pwaCard}
     </div>`;
   }
@@ -8134,6 +8288,25 @@ async function handleDocumentClick(event) {
     if (el.hasAttribute('data-cloud-use-local')) { await cloudUseLocal(); return; }
     if (el.hasAttribute('data-cloud-use-remote')) { await cloudUseRemote(); return; }
     if (el.hasAttribute('data-pwa-install')) { await promptInstallEnglishJourney(); return; }
+    if (el.hasAttribute('data-pwa-update')) { await activatePwaUpdate(); return; }
+    if (el.hasAttribute('data-create-checkpoint')) {
+      const saved = saveProgressCheckpoint('manual', state);
+      cloudRuntime.message = saved ? 'Ponto seguro criado neste dispositivo.' : 'Não foi possível criar o ponto seguro.';
+      render();
+      return;
+    }
+    if (el.dataset.restoreCheckpoint) {
+      const checkpoints = readProgressCheckpoints();
+      const chosen = checkpoints.find(item => item.id === el.dataset.restoreCheckpoint);
+      if (!chosen) { interactionError = 'Este ponto seguro não está mais disponível.'; render(); return; }
+      const summary = chosen.summary || progressEvidence(chosen.state);
+      const ok = confirm(`Restaurar este ponto?\n\n${summary.completedDays || 0}/30 dias · ${summary.seenPhrases || 0} frases · ${summary.xp || 0} XP\n\nO progresso atual será substituído, mas continuará disponível nos checkpoints recentes.`);
+      if (!ok) return;
+      saveProgressCheckpoint('manual', state);
+      if (!restoreProgressCheckpoint(chosen.id)) { interactionError = 'Não foi possível restaurar este ponto seguro.'; render(); return; }
+      navigate('home');
+      return;
+    }
     if (el.hasAttribute('data-onboarding-start')) {
       state.onboardingDone = true;
       saveState(state);
@@ -8517,6 +8690,7 @@ function pauseSession() {
   session.pausedAt = new Date().toISOString();
   session.pauseCount = Number(session.pauseCount || 0) + 1;
   saveState(state, 'pause');
+  saveProgressCheckpoint('session-pause', state);
   feedback = null;
   recallRevealed = false;
   listeningRevealed = false;
@@ -8543,6 +8717,7 @@ function finishSession() {
     return;
   }
 
+  saveProgressCheckpoint('day-complete', state);
   feedback = null;
   recallRevealed = false;
   listeningRevealed = false;
@@ -8576,7 +8751,7 @@ window.EnglishJourneySync = Object.freeze({
   meta: () => ({ ...state.syncMeta }),
   syncNow: () => reconcileWithCloud('external'),
   cloudStatus: () => ({ ...cloudRuntime, client: undefined, session: undefined, authSubscription: undefined, syncTimer: undefined, reconcilePromise: undefined }),
-  persistence: () => ({ mode: getStorageMode(), saveFailures: persistenceSaveFailures, persistedAt: state?._persistedAt || null, completedDays: [...(state?.completedDays || [])], seenPhrases: Object.values(state?.phraseProgress || {}).filter(progress => progress?.seen).length, guardAvailable: Boolean(safeGet('localStorage', COMPLETION_GUARD_KEY) || safeGet('sessionStorage', COMPLETION_GUARD_KEY)) }),
+  persistence: () => ({ mode: getStorageMode(), saveFailures: persistenceSaveFailures, persistedAt: state?._persistedAt || null, completedDays: [...(state?.completedDays || [])], seenPhrases: Object.values(state?.phraseProgress || {}).filter(progress => progress?.seen).length, guardAvailable: Boolean(safeGet('localStorage', COMPLETION_GUARD_KEY) || safeGet('sessionStorage', COMPLETION_GUARD_KEY)), checkpoints: readProgressCheckpoints().map(entry => ({ id:entry.id, at:entry.at, reason:entry.reason, summary:entry.summary })) }),
   markAccepted: (revision) => { markSyncAccepted(state, revision); saveState(state, 'sync-ack'); return createSyncEnvelope(state); }
 });
 
