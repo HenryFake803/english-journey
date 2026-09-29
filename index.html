@@ -14,7 +14,7 @@
 <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
 
 
-<title>English Journey — V1.1.3</title>
+<title>English Journey — V1.1.4</title>
 <style>
 :root {
   --bg: #08101d;
@@ -892,7 +892,7 @@ button:focus-visible,.choice:focus-visible,summary:focus-visible{outline:2px sol
 @media (max-width:380px){.app-shell{padding-left:13px;padding-right:13px}.today-plan{gap:5px}.today-plan span{min-width:0}.summary-grid{gap:6px}.metric{padding-left:5px;padding-right:5px}}
 
 
-/* V1.1.3 — instalação PWA */
+/* V1.1.4 — instalação PWA + proteção de persistência */
 .pwa-install-card{overflow:hidden}.pwa-install-head{display:flex;align-items:center;gap:13px}.pwa-app-badge{width:50px;height:50px;border-radius:16px;display:grid;place-items:center;flex:0 0 auto;background:linear-gradient(145deg,var(--accent),var(--accent-2));color:#07140d;font-size:18px;font-weight:950;letter-spacing:-.08em;box-shadow:0 12px 28px rgba(113,231,165,.14)}.pwa-install-head>div{min-width:0}.pwa-install-head h3{margin:3px 0 5px}.pwa-install-head p{margin:0}.pwa-install-card .primary,.pwa-install-card .ghost{margin-top:15px}.pwa-status-line{margin-top:12px;color:var(--muted);font-size:11px;line-height:1.45}@media(display-mode:standalone){.pwa-install-card .install-only{display:none}}
 
 </style>
@@ -2547,7 +2547,7 @@ function familyVariations(pattern) {
   return FAMILY_VARIATIONS[pattern] || [];
 }
 
-const APP_RELEASE = Object.freeze({ version: '1.1.3', channel: 'pwa-cloud' });
+const APP_RELEASE = Object.freeze({ version: '1.1.4', channel: 'pwa-persistence-hotfix' });
 const KEY = 'english-journey-v061';
 const DEVICE_KEY = `${KEY}-device-id`;
 const SYNC_SCHEMA_VERSION = 1;
@@ -2617,7 +2617,7 @@ let cloudRuntime = {
 };
 
 
-// V1.1.3 — PWA instalável. Em file:// o curso continua funcionando no modo local.
+// V1.1.4 — PWA instalável. Em file:// o curso continua funcionando no modo local.
 let deferredInstallPrompt = null;
 let pwaRuntime = { installed: false, serviceWorker: 'idle', message: null, error: null };
 
@@ -3395,6 +3395,7 @@ window.addEventListener('offline', () => {
 });
 
 const BACKUP_KEY = `${KEY}-backup`;
+const COMPLETION_GUARD_KEY = `${KEY}-completion-guard`;
 const LEGACY_KEYS = ['english-journey-v06', 'english-journey-v05', 'english-journey-v043', 'english-journey-v04', 'english-journey-v02', 'english-journey-v01'];
 const WINDOW_NAME_PREFIX = '__ENGLISH_JOURNEY_V061__:';
 let memorySnapshot = null;
@@ -3430,10 +3431,33 @@ function storedStateCandidate(kind, key, label, priority = 0) {
   return { parsed, label, kind, priority, savedAt };
 }
 
+function progressEvidence(value) {
+  const safe = value && typeof value === 'object' ? value : {};
+  const completedDays = Array.isArray(safe.completedDays) ? safe.completedDays.length : 0;
+  const seenPhrases = safe.phraseProgress && typeof safe.phraseProgress === 'object'
+    ? Object.values(safe.phraseProgress).filter(progress => progress?.seen).length
+    : 0;
+  const historyEntries = Array.isArray(safe.dailyHistory) ? safe.dailyHistory.length : 0;
+  const xp = Number.isFinite(Number(safe.xp)) ? Math.max(0, Number(safe.xp)) : 0;
+  const activeIndex = Number.isFinite(Number(safe.activeSession?.index)) ? Math.max(0, Number(safe.activeSession.index)) : 0;
+  return { completedDays, seenPhrases, historyEntries, xp, activeIndex };
+}
+
+function comparePersistenceCandidates(a, b) {
+  const ae = progressEvidence(a?.parsed);
+  const be = progressEvidence(b?.parsed);
+  for (const key of ['completedDays','seenPhrases','historyEntries','xp','activeIndex']) {
+    if (ae[key] !== be[key]) return be[key] - ae[key];
+  }
+  return b.savedAt - a.savedAt || b.priority - a.priority;
+}
+
 function loadState() {
   const candidates = [
-    storedStateCandidate('localStorage', KEY, 'local', 40),
-    storedStateCandidate('sessionStorage', KEY, 'session', 30),
+    storedStateCandidate('localStorage', KEY, 'local', 50),
+    storedStateCandidate('sessionStorage', KEY, 'session', 40),
+    storedStateCandidate('localStorage', COMPLETION_GUARD_KEY, 'completion-guard-local', 35),
+    storedStateCandidate('sessionStorage', COMPLETION_GUARD_KEY, 'completion-guard-session', 30),
     storedStateCandidate('localStorage', BACKUP_KEY, 'backup-local', 20),
     storedStateCandidate('sessionStorage', BACKUP_KEY, 'backup-session', 10)
   ].filter(Boolean);
@@ -3449,15 +3473,17 @@ function loadState() {
   if (candidates.length) {
     // Se algum fallback contém um save mais novo (por exemplo, localStorage lotou
     // e a sessão continuou no sessionStorage), retomamos o estado mais recente.
-    candidates.sort((a,b) => b.savedAt - a.savedAt || b.priority - a.priority);
+    candidates.sort(comparePersistenceCandidates);
     const chosen = candidates[0];
     const state = upgradeState(chosen.parsed);
     memorySnapshot = clone(state);
     storageMode = chosen.kind === 'localStorage' ? 'local' : chosen.kind === 'sessionStorage' ? 'session' : chosen.kind;
     if (chosen.label.startsWith('backup')) {
       persistenceRecoveryNotice = 'Uma cópia de segurança válida foi usada porque o save principal estava indisponível ou inconsistente.';
-      // Regrava o estado recuperado para curar o armazenamento principal.
       saveState(state, 'backup-recovery');
+    } else if (chosen.label.startsWith('completion-guard')) {
+      persistenceRecoveryNotice = 'O último ponto de conclusão seguro foi recuperado para impedir perda de progresso.';
+      saveState(state, 'completion-guard-recovery');
     } else if (chosen.label === 'session' && candidates.some(c => c.label === 'local' && c.savedAt < chosen.savedAt)) {
       persistenceRecoveryNotice = 'O progresso mais recente foi recuperado do armazenamento temporário porque ele estava à frente da cópia local.';
     }
@@ -3548,11 +3574,41 @@ function saveState(state, reason = 'interaction') {
   return false;
 }
 
+function persistCompletionGuard(target) {
+  const serialized = serializeState(target);
+  if (!serialized || !rawLooksValid(serialized)) return false;
+  let persisted = false;
+  for (const kind of ['localStorage','sessionStorage']) {
+    try {
+      const storage = window[kind];
+      if (!storage) continue;
+      storage.setItem(COMPLETION_GUARD_KEY, serialized);
+      if (storage.getItem(COMPLETION_GUARD_KEY) === serialized) persisted = true;
+    } catch {}
+  }
+  return persisted;
+}
+
+function hasPersistedDayCompletion(dayId) {
+  if (!Number.isInteger(Number(dayId))) return false;
+  const candidates = [
+    safeGet('localStorage', KEY), safeGet('sessionStorage', KEY),
+    safeGet('localStorage', COMPLETION_GUARD_KEY), safeGet('sessionStorage', COMPLETION_GUARD_KEY),
+    safeGet('localStorage', BACKUP_KEY), safeGet('sessionStorage', BACKUP_KEY)
+  ];
+  return candidates.some(raw => {
+    const parsed = parseState(raw);
+    return validStoredState(parsed) && Array.isArray(parsed.completedDays) && parsed.completedDays.includes(Number(dayId));
+  });
+}
+
 function resetState() {
   safeRemove('localStorage', KEY);
   safeRemove('sessionStorage', KEY);
   safeRemove('localStorage', BACKUP_KEY);
   safeRemove('sessionStorage', BACKUP_KEY);
+  safeRemove('localStorage', COMPLETION_GUARD_KEY);
+  safeRemove('sessionStorage', COMPLETION_GUARD_KEY);
   for (const legacyKey of LEGACY_KEYS) {
     safeRemove('localStorage', legacyKey);
     safeRemove('sessionStorage', legacyKey);
@@ -6189,7 +6245,15 @@ function completeDay(state, session, now = new Date()) {
   markStudyActivity(state, now);
   const day = curriculum.find(item => item.id === session.dayId);
   const practiceOnly = session.mode === 'hard-practice';
-  const allSeen = day?.phrases.every(p => getPhraseProgress(state, p.id).seen) ?? false;
+  let allSeen = day?.phrases.every(p => getPhraseProgress(state, p.id).seen) ?? false;
+  const plannedWholeDay = !practiceOnly && day && Number(session.startedSeen || 0) + Number(session.newCount || 0) >= Number(session.dayTotal || day.phrases.length);
+  if (!allSeen && plannedWholeDay) {
+    const introIds = new Set((session.items || []).filter(item => item?.type === 'intro' && item.phraseId).map(item => item.phraseId));
+    for (const phrase of day.phrases) {
+      if (!getPhraseProgress(state, phrase.id).seen && introIds.has(phrase.id)) recordIntro(state, phrase.id, now);
+    }
+    allSeen = day.phrases.every(p => getPhraseProgress(state, p.id).seen);
+  }
   if (!practiceOnly && allSeen && !state.completedDays.includes(session.dayId)) state.completedDays.push(session.dayId);
   state.completedDays.sort((a, b) => a - b);
   state.xp += practiceOnly ? 10 : allSeen ? 30 : 15;
@@ -8406,8 +8470,22 @@ function pauseSession() {
 function finishSession() {
   const session = state.activeSession;
   if (!session) return navigate('home');
+  const beforeCompletion = clone(state);
+  const dayId = Number(session.dayId || 0);
   completeDay(state, session);
-  saveState(state);
+  const saved = saveState(state, 'day-complete');
+  const guarded = persistCompletionGuard(state);
+  const dayWasCompleted = state.completedDays.includes(dayId);
+  const durable = !dayWasCompleted || hasPersistedDayCompletion(dayId);
+
+  if ((!saved && !guarded) || !durable) {
+    state = beforeCompletion;
+    interactionError = 'Não consegui confirmar a gravação do Dia concluído. Seu progresso da sessão foi preservado; tente novamente com armazenamento disponível.';
+    persistenceRecoveryNotice = 'A conclusão não foi descartada porque o armazenamento não confirmou a gravação.';
+    render();
+    return;
+  }
+
   feedback = null;
   recallRevealed = false;
   listeningRevealed = false;
@@ -8431,7 +8509,7 @@ function escapeHtml(text) {
 }
 function capitalize(v) { return v.charAt(0).toUpperCase() + v.slice(1); }
 
-// V1.1.3 — API interna de sincronização + camada PWA instalável.
+// V1.1.4 — API interna de sincronização + camada PWA instalável + diagnóstico de persistência.
 window.EnglishJourneySync = Object.freeze({
   schemaVersion: SYNC_SCHEMA_VERSION,
   deviceId: CURRENT_DEVICE_ID,
@@ -8441,6 +8519,7 @@ window.EnglishJourneySync = Object.freeze({
   meta: () => ({ ...state.syncMeta }),
   syncNow: () => reconcileWithCloud('external'),
   cloudStatus: () => ({ ...cloudRuntime, client: undefined, session: undefined, authSubscription: undefined, syncTimer: undefined, reconcilePromise: undefined }),
+  persistence: () => ({ mode: getStorageMode(), saveFailures: persistenceSaveFailures, persistedAt: state?._persistedAt || null, completedDays: [...(state?.completedDays || [])], seenPhrases: Object.values(state?.phraseProgress || {}).filter(progress => progress?.seen).length, guardAvailable: Boolean(safeGet('localStorage', COMPLETION_GUARD_KEY) || safeGet('sessionStorage', COMPLETION_GUARD_KEY)) }),
   markAccepted: (revision) => { markSyncAccepted(state, revision); saveState(state, 'sync-ack'); return createSyncEnvelope(state); }
 });
 
