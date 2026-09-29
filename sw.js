@@ -1,5 +1,5 @@
 const CACHE_NAME = 'english-journey-shell-v1.1.3';
-const CORE = ['./','./index.html','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/icon-maskable-512.png'];
+const CORE = ['./','./index.html','./manifest.webmanifest','./icons/icon.svg'];
 const SUPABASE_CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
 self.addEventListener('install', event => { event.waitUntil((async () => { const cache=await caches.open(CACHE_NAME); await cache.addAll(CORE); try { const response=await fetch(SUPABASE_CDN,{mode:'cors'}); if(response.ok) await cache.put(SUPABASE_CDN,response.clone()); } catch {} await self.skipWaiting(); })()); });
 self.addEventListener('activate', event => { event.waitUntil((async () => { const names=await caches.keys(); await Promise.all(names.filter(name=>name.startsWith('english-journey-')&&name!==CACHE_NAME).map(name=>caches.delete(name))); await self.clients.claim(); })()); });
