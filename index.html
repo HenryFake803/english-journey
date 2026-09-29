@@ -14,7 +14,7 @@
 <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
 
 
-<title>English Journey — V1.2.1</title>
+<title>English Journey — V1.2.2</title>
 <style>
 :root {
   --bg: #08101d;
@@ -148,6 +148,13 @@ h1, h2, h3, p { margin-top: 0; }
 .cloze-situation { margin-top:12px; padding-top:11px; border-top:1px solid var(--line); display:grid; gap:4px; }
 .cloze-situation small { color:var(--muted); font-size:8px; letter-spacing:.09em; font-weight:900; }
 .cloze-situation span { color:#c4cfdd; font-size:11px; line-height:1.45; }
+.exercise-target-cue { text-align:left; padding:17px 18px; margin:0 0 20px; border-radius:19px; background:linear-gradient(145deg, rgba(113,231,165,.07), var(--panel)); border:1px solid rgba(113,231,165,.15); }
+.exercise-target-cue > small { display:block; color:var(--accent); font-size:9px; letter-spacing:.11em; font-weight:900; margin-bottom:6px; }
+.exercise-target-cue > strong { display:block; font-size:clamp(20px,5vw,30px); line-height:1.28; letter-spacing:-.025em; }
+.exercise-situation { text-align:left; padding:17px 18px; margin:0 0 10px; border-radius:19px; background:var(--panel); border:1px solid var(--line); }
+.exercise-situation > small { display:block; color:var(--muted); font-size:9px; letter-spacing:.11em; font-weight:900; margin-bottom:6px; }
+.exercise-situation > p { margin:0; color:#c7d1de; font-size:13px; line-height:1.48; }
+.exercise-guidance { margin:-9px 0 19px; color:var(--muted); font-size:10px; line-height:1.45; }
 .listen-button { display: grid; justify-items: center; width: 100%; max-width: 360px; margin: 0 auto 27px; background: linear-gradient(145deg, rgba(113,231,165,.15), var(--panel)); border: 1px solid rgba(113,231,165,.2); border-radius: 24px; padding: 24px; }
 .listen-button span { font-size: 31px; }
 .listen-button b { margin-top: 8px; }
@@ -2587,7 +2594,7 @@ function familyVariations(pattern) {
   return FAMILY_VARIATIONS[pattern] || [];
 }
 
-const APP_RELEASE = Object.freeze({ version: '1.2.1', channel: 'cloze-context-audit' });
+const APP_RELEASE = Object.freeze({ version: '1.2.2', channel: 'exercise-ambiguity-audit' });
 const KEY = 'english-journey-v061';
 const DEVICE_KEY = `${KEY}-device-id`;
 const SYNC_SCHEMA_VERSION = 1;
@@ -5816,6 +5823,14 @@ function makeExercise(phrase, state, seed = 0, isReview = false, forcedType = nu
     noChoices = true;
     choices = [];
   }
+  // Produção/contexto só permanecem em múltipla escolha quando existem
+  // distratores suficientemente distintos. Caso contrário, recuperação mental
+  // é pedagogicamente melhor do que inventar alternativas ambíguas.
+  if (['production','context'].includes(type) && choices.length < 3) {
+    type = 'recall';
+    noChoices = true;
+    choices = [];
+  }
   const focusHint = ['scheduled','practice','hard'].includes(kind)
     ? (recurringFocus || (progress.lastOutcome === 'almost' ? progress.lastNearMissFocus : null))
     : null;
@@ -5969,22 +5984,38 @@ function reusablePatternKey(pattern) {
     .replace(/\b(?:noun|object|activity|place|idea|adjective)\b/g, 'slot');
 }
 
-function tooEquivalent(target, candidate) {
+function tooEquivalent(target, candidate, type = 'general') {
   if (normalizeChoice(target.english) === normalizeChoice(candidate.english)) return true;
   if (normalizeChoice(target.portuguese) === normalizeChoice(candidate.portuguese)) return true;
 
-  // Se duas opções dizem praticamente a mesma coisa e têm a mesma polaridade,
-  // elas não servem como distrator: viram uma questão ambígua.
-  if (phrasePolarity(target.english) === phrasePolarity(candidate.english)) {
-    const pt = jaccard(contentTokens(target.portuguese, 'pt'), contentTokens(candidate.portuguese, 'pt'));
-    const en = jaccard(contentTokens(target.english, 'en'), contentTokens(candidate.english, 'en'));
-    if (pt >= 0.92 && en >= 0.72) return true;
-  }
+  // Contrastes curados foram escritos justamente para treinar diferenças pequenas,
+  // então continuam válidos desde que o enunciado explicite a ideia-alvo.
+  if (hasCuratedContrast(target.english, candidate.english)) return false;
+
+  const samePolarity = phrasePolarity(target.english) === phrasePolarity(candidate.english);
+  const targetQuestion = questionKind(target.english);
+  const candidateQuestion = questionKind(candidate.english);
+  if (!samePolarity || targetQuestion !== candidateQuestion) return false;
+
+  const pt = jaccard(contentTokens(target.portuguese, 'pt'), contentTokens(candidate.portuguese, 'pt'));
+  const en = jaccard(contentTokens(target.english, 'en'), contentTokens(candidate.english, 'en'));
+
+  // Regra geral: mensagens quase idênticas não devem disputar a mesma questão.
+  if (pt >= 0.82) return true;
+  if (pt >= 0.58 && en >= 0.58) return true;
+
+  // Em produção/contexto o aluno parte de uma intenção em português.
+  // Um distrator semanticamente muito próximo vira "outra resposta correta".
+  if (['production','context'].includes(type) && pt >= 0.66) return true;
+
+  // Em reconhecimento/listening, traduções muito próximas também geram dupla resposta.
+  if (['meaning','listening'].includes(type) && pt >= 0.72) return true;
+
   return false;
 }
 
-function distractorScore(target, candidate) {
-  if (tooEquivalent(target, candidate)) return -Infinity;
+function distractorScore(target, candidate, type = 'general') {
+  if (tooEquivalent(target, candidate, type)) return -Infinity;
   const targetPattern = reusablePatternKey(target.pattern);
   const candidatePattern = reusablePatternKey(candidate.pattern);
   const targetQuestion = questionKind(target.english);
@@ -6041,14 +6072,14 @@ function distractorCandidatePool(target) {
 }
 
 function rankedDistractorCandidates(target, type, seed) {
-  void type;
-  let ranked = DISTRACTOR_RANKING_CACHE.get(target.id);
+  const cacheKey = `${target.id}:${type || 'general'}`;
+  let ranked = DISTRACTOR_RANKING_CACHE.get(cacheKey);
   if (!ranked) {
     ranked = distractorCandidatePool(target)
-      .map(candidate => ({ candidate, score: distractorScore(target, candidate) }))
+      .map(candidate => ({ candidate, score: distractorScore(target, candidate, type) }))
       .filter(item => Number.isFinite(item.score))
       .sort((a, b) => b.score - a.score || pseudo(`${target.id}:${a.candidate.id}`) - pseudo(`${target.id}:${b.candidate.id}`));
-    DISTRACTOR_RANKING_CACHE.set(target.id, ranked);
+    DISTRACTOR_RANKING_CACHE.set(cacheKey, ranked);
   }
 
   // Pequena rotação entre candidatos de qualidade semelhante evita que toda revisão
@@ -7028,12 +7059,21 @@ function clozeFeedback(target, selected, answer) {
   return { title: 'Compare com a ideia pedida', text: detail };
 }
 
-function genericContrast(target, selectedPhrase) {
+function genericContrast(target, selectedPhrase, exerciseType = null) {
   const targetMeaning = target?.portuguese || '';
   const selectedMeaning = selectedPhrase?.portuguese || '';
   const targetEnglish = target?.english || '';
   const selectedEnglish = selectedPhrase?.english || '';
 
+  if (exerciseType === 'context') {
+    return `“${selectedEnglish}” pode ser uma frase natural em inglês, mas comunica “${selectedMeaning}”. Nesta atividade, a situação vinha acompanhada da ideia-alvo “${targetMeaning}”, expressa por “${targetEnglish}”.`;
+  }
+  if (exerciseType === 'production') {
+    return `“${selectedEnglish}” comunica “${selectedMeaning}”. A ideia-alvo pedida era “${targetMeaning}”, então a frase treinada aqui é “${targetEnglish}”.`;
+  }
+  if (exerciseType === 'meaning' || exerciseType === 'listening') {
+    return `A alternativa escolhida aponta para “${selectedMeaning}”. Nesta atividade, o sentido-alvo da frase é “${targetMeaning}”.`;
+  }
   if (isQuestion(targetEnglish) && isQuestion(selectedEnglish)) {
     return `“${selectedEnglish}” pergunta “${selectedMeaning}”. Aqui você precisava perguntar “${targetMeaning}”: “${targetEnglish}”.`;
   }
@@ -7043,7 +7083,7 @@ function genericContrast(target, selectedPhrase) {
   if (target?.pattern && selectedPhrase?.pattern && target.pattern === selectedPhrase.pattern && !/Frase completa/i.test(target.pattern)) {
     return `As duas usam o mesmo molde (${target.pattern}), mas mudam a mensagem: “${selectedEnglish}” = “${selectedMeaning}”; aqui era “${targetEnglish}” = “${targetMeaning}”.`;
   }
-  return `“${selectedEnglish}” significa “${selectedMeaning}”. Aqui a ideia pedida era “${targetMeaning}”, expressa por “${targetEnglish}”.`;
+  return `“${selectedEnglish}” comunica “${selectedMeaning}”. A ideia-alvo desta atividade era “${targetMeaning}”, expressa por “${targetEnglish}”.`;
 }
 
 function mistakeFeedback(item, targetPhrase, selectedChoice) {
@@ -7064,7 +7104,7 @@ function mistakeFeedback(item, targetPhrase, selectedChoice) {
 
   return {
     title: 'Compare o sentido',
-    text: genericContrast(targetPhrase, selectedPhrase),
+    text: genericContrast(targetPhrase, selectedPhrase, item.type),
     selectedPhraseId: selectedPhrase.id
   };
 }
@@ -8256,16 +8296,20 @@ function exerciseCard(item, phrase) {
   if (item.type === 'listening-recall') return listeningRecallCard(item, phrase);
 
   const title = {
-    meaning: 'O que essa frase significa?',
-    production: 'Qual frase expressa esta ideia?',
-    listening: 'Escute e escolha o significado.',
-    context: 'O que você diria nessa situação?',
+    meaning: 'Qual opção corresponde ao sentido desta frase?',
+    production: 'Qual frase corresponde exatamente à ideia-alvo?',
+    listening: 'Escute e escolha a opção que corresponde ao sentido.',
+    context: 'Nesta situação, qual frase corresponde à ideia-alvo?',
     cloze: 'Complete a frase para expressar a ideia abaixo.'
   }[item.type];
   let prompt = '';
   if (item.type === 'meaning') prompt = `<div class="prompt-main">${escapeHtml(phrase.english)}</div>`;
-  if (item.type === 'production') prompt = `<div class="prompt-main pt">${escapeHtml(phrase.portuguese)}</div>`;
-  if (item.type === 'context') prompt = `<div class="context-large">${escapeHtml(phrase.context)}</div>`;
+  if (item.type === 'production') {
+    prompt = `<div class="exercise-target-cue"><small>IDEIA-ALVO</small><strong>${escapeHtml(phrase.portuguese)}</strong></div><div class="exercise-guidance">Escolha a frase que corresponde a esta mensagem específica — não apenas uma frase que também seria possível em outra situação.</div>`;
+  }
+  if (item.type === 'context') {
+    prompt = `<div class="exercise-situation"><small>SITUAÇÃO</small><p>${escapeHtml(phrase.situation || phrase.context)}</p></div><div class="exercise-target-cue"><small>IDEIA-ALVO</small><strong>${escapeHtml(phrase.portuguese)}</strong></div><div class="exercise-guidance">A situação dá o cenário; a ideia-alvo define exatamente o que você quer comunicar.</div>`;
+  }
   if (item.type === 'cloze') {
     const situation = phrase.contextQuality === 'specific' && phrase.context
       ? `<div class="cloze-situation"><small>SITUAÇÃO</small><span>${escapeHtml(phrase.context)}</span></div>`
