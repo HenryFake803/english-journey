@@ -3579,8 +3579,10 @@ function saveProgressCheckpoint(reason = 'manual', target = state) {
   return persistProgressCheckpoints([entry, ...history]);
 }
 
-function restoreProgressCheckpoint(id) {
-  const entry = readProgressCheckpoints().find(item => item.id === id);
+function restoreProgressCheckpoint(idOrEntry) {
+  const entry = idOrEntry && typeof idOrEntry === 'object'
+    ? idOrEntry
+    : readProgressCheckpoints().find(item => item.id === idOrEntry);
   if (!entry) return false;
   const currentMeta = sanitizeSyncMeta(state?.syncMeta, state?._persistedAt);
   const restored = upgradeState(entry.state, { resetSession: false });
@@ -8303,7 +8305,7 @@ async function handleDocumentClick(event) {
       const ok = confirm(`Restaurar este ponto?\n\n${summary.completedDays || 0}/30 dias · ${summary.seenPhrases || 0} frases · ${summary.xp || 0} XP\n\nO progresso atual será substituído, mas continuará disponível nos checkpoints recentes.`);
       if (!ok) return;
       saveProgressCheckpoint('manual', state);
-      if (!restoreProgressCheckpoint(chosen.id)) { interactionError = 'Não foi possível restaurar este ponto seguro.'; render(); return; }
+      if (!restoreProgressCheckpoint(chosen)) { interactionError = 'Não foi possível restaurar este ponto seguro.'; render(); return; }
       navigate('home');
       return;
     }
