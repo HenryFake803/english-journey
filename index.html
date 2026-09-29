@@ -14,7 +14,7 @@
 <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
 
 
-<title>English Journey — V1.1.5</title>
+<title>English Journey — V1.1.6</title>
 <style>
 :root {
   --bg: #08101d;
@@ -2570,7 +2570,7 @@ function familyVariations(pattern) {
   return FAMILY_VARIATIONS[pattern] || [];
 }
 
-const APP_RELEASE = Object.freeze({ version: '1.1.5', channel: 'progress-safety' });
+const APP_RELEASE = Object.freeze({ version: '1.1.6', channel: 'multi-device-sync' });
 const KEY = 'english-journey-v061';
 const DEVICE_KEY = `${KEY}-device-id`;
 const SYNC_SCHEMA_VERSION = 1;
@@ -3000,6 +3000,8 @@ function stateFromSyncEnvelope(envelope) {
 }
 
 
+const GOOGLE_OAUTH_READY = false;
+
 function hostedApp() {
   return location.protocol === 'https:' || location.protocol === 'http:';
 }
@@ -3044,15 +3046,39 @@ function formatCloudDate(value) {
 }
 
 function cloudStateSummary(envelope) {
-  if (!validSyncEnvelope(envelope)) return { xp: 0, days: 0, phrases: 0, revision: 0, updatedAt: null };
+  if (!validSyncEnvelope(envelope)) return { xp: 0, days: 0, phrases: 0, revision: 0, updatedAt: null, sourceDeviceId: null };
   const s = envelope.state || {};
   return {
     xp: Number(s.xp || 0),
     days: Array.isArray(s.completedDays) ? s.completedDays.length : 0,
     phrases: s.phraseProgress && typeof s.phraseProgress === 'object' ? Object.values(s.phraseProgress).filter(p => p?.seen).length : 0,
     revision: Number(envelope.revision || 0),
-    updatedAt: envelope.updatedAt || null
+    updatedAt: envelope.updatedAt || null,
+    sourceDeviceId: envelope.sourceDeviceId || null
   };
+}
+
+function shortDeviceId(value) {
+  const text = String(value || '');
+  return text ? text.slice(-10) : '—';
+}
+
+function multiDeviceStatusCard() {
+  if (!cloudRuntime.user) return '';
+  const remote = cloudStateSummary(cloudRuntime.remoteEnvelope);
+  const local = cloudStateSummary(createSyncEnvelope(state));
+  const sameDevice = remote.sourceDeviceId && remote.sourceDeviceId === CURRENT_DEVICE_ID;
+  const remoteDevice = remote.sourceDeviceId ? shortDeviceId(remote.sourceDeviceId) : 'ainda sem save';
+  const remoteWhen = remote.updatedAt ? formatCloudDate(remote.updatedAt) : '—';
+  return `<section class="account-card multi-device-card">
+    <small>MULTI-DISPOSITIVO</small>
+    <h3>${cloudRuntime.remoteEnvelope ? 'Este dispositivo está comparando com a mesma conta na nuvem.' : 'Aguardando o primeiro save na nuvem.'}</h3>
+    <div class="cloud-compare">
+      <div class="cloud-version"><b>ESTE DISPOSITIVO</b><strong>${local.xp} XP</strong><span>${local.days}/30 dias concluídos</span><span>${local.phrases} frases vistas</span><span>rev ${local.revision} · ${shortDeviceId(CURRENT_DEVICE_ID)}</span></div>
+      <div class="cloud-version"><b>ÚLTIMA CÓPIA NA NUVEM</b><strong>${cloudRuntime.remoteEnvelope ? `${remote.xp} XP` : 'Sem cópia'}</strong><span>${cloudRuntime.remoteEnvelope ? `${remote.days}/30 dias concluídos` : '—'}</span><span>${cloudRuntime.remoteEnvelope ? `${remote.phrases} frases vistas` : '—'}</span><span>${cloudRuntime.remoteEnvelope ? `rev ${remote.revision} · ${remoteDevice} · ${remoteWhen}` : 'Sincronize para criar'}</span></div>
+    </div>
+    <p class="cloud-config-note">${sameDevice ? 'A última gravação na nuvem veio deste mesmo dispositivo.' : cloudRuntime.remoteEnvelope ? 'A última gravação veio de outro dispositivo ou de outra instalação deste app.' : 'Depois do primeiro sync, PC e celular poderão comparar o mesmo save.'}</p>
+  </section>`;
 }
 
 function safeCloudRender() {
@@ -3177,6 +3203,8 @@ async function pushLocalToCloud({ force = false, skipInitialPrompt = false } = {
     markSyncAccepted(state, envelope.revision);
     state.syncMeta.ownerUserId = cloudRuntime.user.id;
     saveState(state, 'sync-ack');
+    cloudRuntime.remoteEnvelope = envelope;
+    saveProgressCheckpoint('cloud-synced', state);
     cloudRuntime.status = 'synced';
     cloudRuntime.conflict = null;
     safeCloudRender();
@@ -3194,6 +3222,7 @@ async function pushLocalToCloud({ force = false, skipInitialPrompt = false } = {
     bindStateToCloudUser(cloudRuntime.user);
     markSyncAccepted(state, remote.revision);
     saveState(state, 'sync-ack');
+    cloudRuntime.remoteEnvelope = remote;
     cloudRuntime.status = 'synced';
     cloudRuntime.conflict = null;
     safeCloudRender();
@@ -3220,6 +3249,7 @@ async function pushLocalToCloud({ force = false, skipInitialPrompt = false } = {
   markSyncAccepted(state, state.syncMeta.revision);
   state.syncMeta.ownerUserId = cloudRuntime.user.id;
   saveState(state, 'sync-ack');
+  saveProgressCheckpoint('cloud-synced', state);
   cloudRuntime.status = 'synced';
   cloudRuntime.conflict = null;
   cloudRuntime.remoteEnvelope = uploaded;
@@ -3389,6 +3419,11 @@ async function cloudSignUp(email, password) {
 }
 
 async function cloudGoogleSignIn() {
+  if (!GOOGLE_OAUTH_READY) {
+    cloudRuntime.error = 'Google Login ainda não foi ativado no backend.';
+    safeCloudRender();
+    return;
+  }
   if (!cloudRuntime.client || !hostedApp()) return;
   const { error } = await cloudRuntime.client.auth.signInWithOAuth({
     provider: 'google',
@@ -3523,7 +3558,8 @@ function checkpointReasonLabel(reason) {
     'session-pause':'Sessão pausada',
     'before-cloud-restore':'Antes de carregar a nuvem',
     'manual':'Ponto criado manualmente',
-    'history-restore':'Restauração anterior'
+    'history-restore':'Restauração anterior',
+    'cloud-synced':'Sincronizado com a nuvem'
   })[reason] || 'Ponto seguro';
 }
 
@@ -7349,6 +7385,7 @@ function accountView() {
   const pwaCard = pwaInstallCard();
   const safetyCard = persistenceSafetyCard();
   const historyCard = checkpointHistoryCard();
+  const multiDeviceCard = multiDeviceStatusCard();
 
   if (!configured) {
     return `<div class="account-page">
@@ -7364,10 +7401,6 @@ function accountView() {
         <p class="cloud-config-note">Use somente a chave pública/publishable do projeto. Nunca cole uma <b>service_role</b> no navegador.</p>
       </section>
       <section class="account-card"><small>MODO ATUAL</small><h3>Seu progresso segue protegido localmente.</h3><p>Device ID: ${escapeHtml(CURRENT_DEVICE_ID.slice(-14))} · revisão local ${Number(state.syncMeta?.revision || 0)}.</p></section>
-      ${safetyCard}
-      ${historyCard}
-      ${safetyCard}
-      ${historyCard}
       ${safetyCard}
       ${historyCard}
       ${pwaCard}
@@ -7386,11 +7419,13 @@ function accountView() {
         </div>
         <div class="account-actions"><button type="button" class="primary" data-auth-signin>ENTRAR</button><button type="button" class="ghost" data-auth-signup>CRIAR CONTA</button></div>
         <div class="account-divider">ou</div>
-        <button type="button" class="ghost full" data-auth-google ${hostedApp() ? '' : 'disabled title="Disponível quando o app estiver hospedado em HTTP/HTTPS"'}>CONTINUAR COM GOOGLE</button>
-        ${!hostedApp() ? `<p class="cloud-config-note">O login por Google precisa de uma URL hospedada. E-mail e senha podem ser usados durante os testes locais.</p>` : ''}
+        <button type="button" class="ghost full" data-auth-google ${GOOGLE_OAUTH_READY && hostedApp() ? '' : 'disabled'}>${GOOGLE_OAUTH_READY ? 'CONTINUAR COM GOOGLE' : 'GOOGLE LOGIN · CONFIGURAÇÃO PENDENTE'}</button>
+        <p class="cloud-config-note">${GOOGLE_OAUTH_READY ? 'Use sua conta Google para entrar no mesmo progresso.' : 'O app já está preparado para Google OAuth, mas o provedor ainda precisa do Client ID e Client Secret criados no Google Cloud.'}</p>
         ${message}
       </section>
       <details class="account-card cloud-config-details"><summary>Configuração da nuvem</summary><p>Projeto: ${escapeHtml(CLOUD_CONFIG.url)}</p><button type="button" class="ghost full" data-cloud-clear-config>REMOVER CONFIGURAÇÃO DESTE DISPOSITIVO</button></details>
+      ${safetyCard}
+      ${historyCard}
       ${pwaCard}
     </div>`;
   }
@@ -7412,6 +7447,9 @@ function accountView() {
       <p>Última sincronização: ${state.syncMeta?.lastSyncedAt ? escapeHtml(formatCloudDate(state.syncMeta.lastSyncedAt)) : 'ainda não realizada'}<br>Dispositivo: ${escapeHtml(CURRENT_DEVICE_ID.slice(-14))}</p>
       <div class="account-actions"><button type="button" class="primary" data-cloud-sync-now ${cloudRuntime.conflict ? 'disabled' : ''}>SINCRONIZAR AGORA</button><button type="button" class="ghost" data-auth-signout>SAIR</button></div>
     </section>
+    ${multiDeviceCard}
+    ${safetyCard}
+    ${historyCard}
     <details class="account-card cloud-config-details"><summary>Configuração técnica</summary><p>Backend: ${escapeHtml(CLOUD_CONFIG.url)}<br>Schema de sync: ${SYNC_SCHEMA_VERSION}</p><button type="button" class="ghost full" data-cloud-clear-config>DESCONECTAR ESTE BACKEND</button></details>
     ${pwaCard}
   </div>`;
@@ -8743,7 +8781,7 @@ function escapeHtml(text) {
 }
 function capitalize(v) { return v.charAt(0).toUpperCase() + v.slice(1); }
 
-// V1.1.5 — API interna de sincronização + histórico restaurável + diagnóstico de persistência.
+// V1.1.6 — sincronização multi-dispositivo + histórico restaurável + diagnóstico.
 window.EnglishJourneySync = Object.freeze({
   schemaVersion: SYNC_SCHEMA_VERSION,
   deviceId: CURRENT_DEVICE_ID,
