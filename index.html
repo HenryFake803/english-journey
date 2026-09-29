@@ -7567,6 +7567,27 @@ function accountView() {
   </div>`;
 }
 
+function postTaskReviewCard(state, now = new Date(), hasSession = false) {
+  if (!primarySessionCompletedToday(state, now)) return '';
+  const activeFree = state.activeSession?.mode === 'free-review';
+  if (hasSession && !activeFree) return '';
+  const studied = allPhrases.filter(phrase => getPhraseProgress(state, phrase.id).seen).length;
+  if (!studied) return '';
+  const sessions = freeReviewSessionsToday(state, now);
+  const amount = Math.min(12, studied);
+  const title = activeFree ? 'Sua revisão livre está em andamento.' : sessions ? 'Quer fazer mais uma revisão curta?' : 'Quer continuar praticando?';
+  const copy = activeFree
+    ? 'Você pode retomar exatamente de onde parou. Esta sessão não libera frases novas.'
+    : 'A tarefa principal de hoje já foi concluída. Agora o app pode revisar apenas frases que você já estudou, sem mexer na progressão do curso.';
+  const button = activeFree ? 'CONTINUAR REVISÃO' : 'REVISÃO INTELIGENTE';
+  return `<section class="post-task-review">
+    <div class="post-task-review-head"><div class="post-task-review-icon">↻</div><div><small>DIA CONCLUÍDO · PRÁTICA OPCIONAL</small><h2>${escapeHtml(title)}</h2><p>${escapeHtml(copy)}</p></div></div>
+    <div class="post-task-review-meta"><span>${amount} frases</span><span>~5 min</span><span>0 frases novas</span>${sessions ? `<span>${sessions} revisão${sessions === 1 ? '' : 'ões'} extra${sessions === 1 ? '' : 's'} hoje</span>` : ''}</div>
+    <button type="button" class="primary full" data-free-review>${button}</button>
+    <small class="post-task-review-note">A Revisão Livre usa as frases mais úteis para reforçar agora, mas tem impacto leve no espaçamento para não “farmar” domínio repetindo tudo no mesmo dia.</small>
+  </section>`;
+}
+
 // V0.9.4 — Home orientada à próxima ação; detalhes ficam sob demanda.
 function homeView() {
   const now = new Date();
@@ -7620,6 +7641,7 @@ function homeView() {
       ${!hasSession ? todayGuidance(plan, continuity) : ''}
       ${!completedAll ? `<div class="today-progress"><div><span>${seenToday}/40 do dia</span><b>${Math.round(seenToday / 40 * 100)}%</b></div><div class="progress-track"><i style="width:${Math.round(seenToday / 40 * 100)}%"></i></div><small>${hasSession ? 'Seu ponto está salvo. Cada bloco concluído é um ponto seguro para pausar e continuar depois.' : plan.dailyCapReached ? `Você já concluiu o teto de ${plan.dailyNewCap} novas de hoje. Amanhã o motor recalcula a carga.` : plan.newGoal < 40 ? `Hoje a carga foi ajustada para até ${plan.newGoal} novas para proteger a retenção.` : 'Ritmo compacto: 4 blocos de até 10 frases, com ponto de pausa entre eles.'}</small></div>` : ''}
     </section>
+    ${postTaskReviewCard(state, now, hasSession)}
 
     <section class="home-pulse" aria-label="Resumo rápido">
       <div><span>🔥</span><strong>${s.streak}</strong><small>sequência</small></div>
@@ -7639,6 +7661,7 @@ function homeView() {
 
 function sessionResumeLabel(session) {
   if (!session?.items?.length) return 'CONTINUAR SESSÃO';
+  if (session.mode === 'free-review') return 'CONTINUAR · REVISÃO LIVRE';
   const block = activeLessonBlock(session);
   const total = Math.max(0, ...session.items.map(item => Number(item?.blockTotal || item?.blockNumber || 0)));
   if (block && total) return `CONTINUAR · BLOCO ${block}/${total}`;
@@ -8020,6 +8043,7 @@ function lessonView() {
 
 function lessonStage(session, item) {
   if (!session || !item) return null;
+  if (session.mode === 'free-review' || item.id === 'free-review' || item.freeReview) return { primary: 'REVISÃO LIVRE', secondary: `${session.reviewCount || 0} frases` };
   if (item.id === 'review-start' || item.reviewKind === 'scheduled') return { primary: 'REVISÃO', secondary: `${session.reviewCount || 0} programadas` };
   if (item.id === 'hard-focus' || item.id === 'hard-practice' || item.reviewKind === 'hard') return { primary: 'REFORÇO', secondary: `${session.hardCount || 0} difíceis` };
   if (item.id === 'family-transfer' || item.type === 'variation') return { primary: 'TRANSFERÊNCIA', secondary: `${session.variationCount || 0} variações` };
@@ -8470,6 +8494,7 @@ async function handleDocumentClick(event) {
     }
     if (el.hasAttribute('data-dismiss-achievements')) { state.recentAchievements = []; saveState(state); return render(); }
     if (el.dataset.start) return startDay(Number(el.dataset.start));
+    if (el.hasAttribute('data-free-review')) return startFreeReview();
     if (el.hasAttribute('data-hard-practice')) return startHardPractice();
 
     if (el.hasAttribute('data-variation-audio')) {
@@ -8553,6 +8578,33 @@ function startDay(dayId) {
   if (!session || !Array.isArray(session.items)) return;
   state.activeSession = session;
   saveState(state);
+  navigate('lesson');
+}
+
+function startFreeReview() {
+  if (!RELEASE_INTEGRITY.ok) {
+    interactionError = 'A revisão foi bloqueada porque esta cópia do curso falhou na verificação de integridade.';
+    render();
+    return;
+  }
+  if (state.activeSession?.items?.length) {
+    saveState(state);
+    navigate('lesson');
+    return;
+  }
+  if (!primarySessionCompletedToday(state, new Date())) {
+    interactionError = 'Conclua primeiro a tarefa principal de hoje para liberar a Revisão Livre.';
+    render();
+    return;
+  }
+  const session = buildFreeReviewSession(state, new Date(), 12);
+  if (!session) {
+    interactionError = 'Ainda não há frases estudadas suficientes para montar uma revisão.';
+    render();
+    return;
+  }
+  state.activeSession = session;
+  saveState(state, 'free-review-start');
   navigate('lesson');
 }
 
