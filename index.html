@@ -14,7 +14,7 @@
 <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
 
 
-<title>English Journey — V1.2.0</title>
+<title>English Journey — V1.2.1</title>
 <style>
 :root {
   --bg: #08101d;
@@ -142,6 +142,12 @@ h1, h2, h3, p { margin-top: 0; }
 .prompt-main { font-size: clamp(30px, 8vw, 51px); font-weight: 850; letter-spacing: -.045em; line-height: 1.08; margin: 0 0 32px; }
 .prompt-main.pt { font-size: clamp(26px, 7vw, 42px); }
 .context-large { padding: 23px; background: var(--panel); border: 1px solid var(--line); border-radius: 23px; font-size: 18px; font-weight: 700; line-height: 1.45; margin-bottom: 25px; }
+.cloze-target-cue { text-align:left; padding:17px 18px; margin:0 0 20px; border-radius:19px; background:linear-gradient(145deg, rgba(113,231,165,.08), var(--panel)); border:1px solid rgba(113,231,165,.16); }
+.cloze-target-cue > small { display:block; color:var(--accent); font-size:9px; letter-spacing:.11em; font-weight:900; margin-bottom:6px; }
+.cloze-target-cue > strong { display:block; font-size:clamp(18px,4.6vw,25px); line-height:1.28; letter-spacing:-.02em; }
+.cloze-situation { margin-top:12px; padding-top:11px; border-top:1px solid var(--line); display:grid; gap:4px; }
+.cloze-situation small { color:var(--muted); font-size:8px; letter-spacing:.09em; font-weight:900; }
+.cloze-situation span { color:#c4cfdd; font-size:11px; line-height:1.45; }
 .listen-button { display: grid; justify-items: center; width: 100%; max-width: 360px; margin: 0 auto 27px; background: linear-gradient(145deg, rgba(113,231,165,.15), var(--panel)); border: 1px solid rgba(113,231,165,.2); border-radius: 24px; padding: 24px; }
 .listen-button span { font-size: 31px; }
 .listen-button b { margin-top: 8px; }
@@ -2581,7 +2587,7 @@ function familyVariations(pattern) {
   return FAMILY_VARIATIONS[pattern] || [];
 }
 
-const APP_RELEASE = Object.freeze({ version: '1.2.0', channel: 'free-review' });
+const APP_RELEASE = Object.freeze({ version: '1.2.1', channel: 'cloze-context-audit' });
 const KEY = 'english-journey-v061';
 const DEVICE_KEY = `${KEY}-device-id`;
 const SYNC_SCHEMA_VERSION = 1;
@@ -7011,14 +7017,15 @@ function isNegative(text) {
 
 function clozeFeedback(target, selected, answer) {
   const sentence = target?.english || '';
+  const meaning = target?.portuguese || '';
   const answerText = String(answer || '');
   const selectedText = String(selected || '');
   const pattern = target?.pattern && !/Frase completa/i.test(target.pattern) ? target.pattern : '';
-  const frame = sentence.replace(new RegExp(`\\b${answerText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'), '_____');
-  const detail = pattern
-    ? `Aqui o molde é “${pattern}”. “${answerText}” completa naturalmente “${frame}”; “${selectedText}” não expressa a frase-alvo.`
-    : `A frase completa é “${sentence}”. Neste contexto, a palavra que completa a ideia é “${answerText}”, não “${selectedText}”.`;
-  return { title: 'Olhe para o encaixe', text: detail };
+  const escapedAnswer = answerText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const selectedSentence = sentence.replace(new RegExp(`\\b${escapedAnswer}\\b`, 'i'), selectedText);
+  const patternNote = pattern ? ` O molde estudado é “${pattern}”.` : '';
+  const detail = `A ideia pedida era “${meaning}”. A frase-alvo estudada é “${sentence}”.${patternNote} Se “${selectedSentence}” parecer uma frase possível, repare no objetivo: aqui você precisa reconstruir a frase-alvo para essa ideia, e não apenas escolher qualquer palavra que possa caber gramaticalmente.`;
+  return { title: 'Compare com a ideia pedida', text: detail };
 }
 
 function genericContrast(target, selectedPhrase) {
@@ -8253,13 +8260,18 @@ function exerciseCard(item, phrase) {
     production: 'Qual frase expressa esta ideia?',
     listening: 'Escute e escolha o significado.',
     context: 'O que você diria nessa situação?',
-    cloze: 'Complete a frase.'
+    cloze: 'Complete a frase para expressar a ideia abaixo.'
   }[item.type];
   let prompt = '';
   if (item.type === 'meaning') prompt = `<div class="prompt-main">${escapeHtml(phrase.english)}</div>`;
   if (item.type === 'production') prompt = `<div class="prompt-main pt">${escapeHtml(phrase.portuguese)}</div>`;
   if (item.type === 'context') prompt = `<div class="context-large">${escapeHtml(phrase.context)}</div>`;
-  if (item.type === 'cloze') prompt = `<div class="prompt-main">${escapeHtml(item.adaptiveMaskedPrompt || clozePrompt(phrase))}</div>`;
+  if (item.type === 'cloze') {
+    const situation = phrase.contextQuality === 'specific' && phrase.context
+      ? `<div class="cloze-situation"><small>SITUAÇÃO</small><span>${escapeHtml(phrase.context)}</span></div>`
+      : '';
+    prompt = `<div class="cloze-target-cue"><small>IDEIA-ALVO</small><strong>${escapeHtml(phrase.portuguese)}</strong>${situation}</div><div class="prompt-main">${escapeHtml(item.adaptiveMaskedPrompt || clozePrompt(phrase))}</div>`;
+  }
   if (item.type === 'listening') prompt = `<div class="audio-speed-row"><button class="listen-button" data-audio="${phrase.id}" data-audio-speed="normal"><span>🔊</span><b>OUVIR NORMAL</b><small>velocidade natural</small></button><button class="audio-speed-secondary" data-audio="${phrase.id}" data-audio-speed="slow">🐢 OUVIR DEVAGAR</button></div>`;
 
   return `<article class="exercise-card ${feedback ? 'has-feedback' : ''}">
