@@ -14,7 +14,7 @@
 <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
 
 
-<title>English Journey — V1.3.2</title>
+<title>English Journey — V1.3.3</title>
 <style>
 :root {
   --bg: #07111f;
@@ -1270,6 +1270,73 @@ button:focus-visible,.choice:focus-visible,summary:focus-visible{outline:2px sol
 .support-note { display:block; margin-top:8px; color:#a9d8ff; font-size:9px; font-style:normal; font-weight:850; line-height:1.4; }
 .today-plan .due small { color:#a9d8ff; }
 .today-plan .due em { color:#8fb9df; }
+
+/* V1.3.3 — Revisão Casual */
+.casual-library-entry { position:relative; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:center; margin:0 0 16px; padding:16px; border-radius:22px; background:linear-gradient(145deg, rgba(141,199,255,.075), rgba(16,28,45,.98)); border:1px solid rgba(141,199,255,.16); }
+.casual-library-entry > div { display:flex; gap:12px; align-items:flex-start; }
+.casual-library-entry > div > span { width:40px; height:40px; flex:0 0 auto; display:grid; place-items:center; border-radius:13px; background:rgba(141,199,255,.10); color:#a9d8ff; font-size:19px; }
+.casual-library-entry small, .casual-hub small, .casual-session small, .casual-finished small { color:#a9d8ff; font-size:9px; font-weight:900; letter-spacing:.11em; }
+.casual-library-entry h2 { margin:4px 0 3px; font-size:15px; }
+.casual-library-entry p { margin:0; color:var(--muted); font-size:9px; line-height:1.4; }
+.casual-library-entry em { position:absolute; right:16px; bottom:5px; color:var(--muted); font-size:8px; font-style:normal; }
+
+.phrase-row-actions { display:grid; justify-items:center; gap:9px; }
+.phrase-favorite, .casual-star { border:0; background:transparent; color:#6f7f93; font-size:18px; padding:5px; }
+.phrase-favorite.active, .casual-star.active { color:var(--yellow); }
+
+.casual-hub { padding-bottom:18px; }
+.casual-hero { display:flex; gap:14px; align-items:flex-start; padding:20px; border-radius:25px; background:linear-gradient(145deg, rgba(141,199,255,.10), rgba(16,28,45,.98)); border:1px solid rgba(141,199,255,.17); box-shadow:var(--shadow-soft); }
+.casual-hero > span { width:48px; height:48px; flex:0 0 auto; display:grid; place-items:center; border-radius:16px; background:rgba(141,199,255,.10); color:#bfe3ff; font-size:24px; }
+.casual-hero h1 { margin:5px 0 5px; font-size:21px; line-height:1.15; }
+.casual-hero p { margin:0; color:var(--muted); font-size:10px; line-height:1.5; }
+.casual-length { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:15px 0 10px; padding:12px 14px; border-radius:17px; background:rgba(255,255,255,.025); border:1px solid var(--line); }
+.casual-length > div { display:flex; gap:6px; }
+.casual-length button { min-width:42px; padding:7px 9px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--muted); font-weight:900; font-size:10px; }
+.casual-length button.active { color:#071522; background:#a9d8ff; border-color:#a9d8ff; }
+.casual-mode-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:9px; }
+.casual-mode-card { position:relative; display:flex; gap:11px; align-items:flex-start; min-height:104px; padding:14px; text-align:left; border-radius:18px; border:1px solid var(--line); background:linear-gradient(145deg, rgba(20,36,57,.96), rgba(13,25,42,.96)); color:var(--text); }
+.casual-mode-card > span { width:34px; height:34px; flex:0 0 auto; display:grid; place-items:center; border-radius:11px; background:rgba(141,199,255,.08); color:#b8ddff; font-size:14px; font-weight:900; }
+.casual-mode-card b { font-size:12px; }
+.casual-mode-card p { margin:4px 0 0; color:var(--muted); font-size:9px; line-height:1.4; }
+.casual-mode-card em { position:absolute; right:10px; top:10px; color:var(--yellow); font-style:normal; font-size:9px; font-weight:900; }
+.casual-mode-card.muted { opacity:.65; }
+.casual-mode-card:hover { border-color:rgba(141,199,255,.22); transform:translateY(-1px); }
+.casual-safety { margin:12px 3px 0; color:var(--muted); font-size:9px; line-height:1.45; }
+
+.casual-session { max-width:620px; margin:0 auto; padding-bottom:30px; }
+.casual-session-top { display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:center; margin-bottom:14px; }
+.casual-session-top > button { width:39px; height:39px; border-radius:13px; border:1px solid var(--line); background:var(--panel); color:var(--text); font-size:22px; }
+.casual-session-top > div { display:grid; gap:5px; }
+.casual-session-top > span { color:var(--muted); font-size:10px; font-weight:900; }
+.casual-progress { height:5px; border-radius:99px; overflow:hidden; background:var(--soft); }
+.casual-progress i { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#8dc7ff,#c7e6ff); }
+.casual-card { position:relative; min-height:390px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:34px 22px 28px; border-radius:30px; background:radial-gradient(circle at 50% 0%, rgba(141,199,255,.09), transparent 18rem), linear-gradient(155deg, rgba(17,31,49,.98), rgba(9,21,36,.98)); border:1px solid rgba(141,199,255,.14); box-shadow:0 24px 58px rgba(0,0,0,.23); }
+.casual-card-actions { position:absolute; left:14px; right:14px; top:12px; display:flex; justify-content:space-between; }
+.casual-audio { border:1px solid rgba(141,199,255,.14); background:rgba(141,199,255,.07); color:#c8e7ff; border-radius:11px; padding:7px 9px; font-size:11px; }
+.casual-card > small { max-width:390px; margin-bottom:22px; color:var(--muted); letter-spacing:.02em; line-height:1.45; }
+.casual-card h1 { margin:10px 0; font-size:clamp(31px,7vw,48px); letter-spacing:-.045em; line-height:1.08; }
+.casual-portuguese { max-width:520px; color:#b2bfd0; font-size:16px; line-height:1.35; }
+.casual-portuguese.lead { color:#f3f8ff; font-size:clamp(23px,5vw,34px); font-weight:800; letter-spacing:-.025em; }
+.casual-context { max-width:470px; margin-top:12px; padding:10px 12px; border-radius:14px; background:rgba(255,255,255,.025); color:var(--muted); font-size:9px; line-height:1.45; }
+.casual-audio-main { width:128px; height:128px; display:grid; place-items:center; align-content:center; gap:5px; margin:8px 0 20px; border-radius:50%; border:1px solid rgba(141,199,255,.18); background:radial-gradient(circle, rgba(141,199,255,.15), rgba(141,199,255,.045)); color:#d8efff; }
+.casual-audio-main span { font-size:35px; }
+.casual-audio-main b { font-size:9px; }
+.casual-nav-actions { display:grid; grid-template-columns:1fr 1.5fr; gap:9px; margin-top:12px; }
+.casual-nav-actions button { min-height:52px; }
+.casual-zero-impact { display:block; margin-top:10px; text-align:center; color:#6f849c !important; }
+.casual-finished { max-width:560px; margin:42px auto; text-align:center; padding:34px 22px; border-radius:28px; background:var(--panel); border:1px solid rgba(141,199,255,.15); }
+.casual-finished > div { width:64px; height:64px; display:grid; place-items:center; margin:0 auto 14px; border-radius:20px; background:rgba(141,199,255,.10); color:#a9d8ff; font-size:27px; }
+.casual-finished h1 { margin:7px 0; font-size:25px; }
+.casual-finished p { margin:0 auto 18px; max-width:440px; color:var(--muted); font-size:10px; line-height:1.5; }
+.casual-finished button { width:100%; margin-top:8px; }
+.post-task-review-actions { display:grid; grid-template-columns:1.25fr 1fr; gap:8px; margin-top:12px; }
+@media (max-width:520px) {
+  .casual-mode-grid { grid-template-columns:1fr; }
+  .casual-card { min-height:360px; padding-left:16px; padding-right:16px; }
+  .casual-library-entry { grid-template-columns:1fr; }
+  .casual-library-entry > button { width:100%; }
+  .post-task-review-actions { grid-template-columns:1fr; }
+}
 </style>
 </head>
 <body>
@@ -2922,7 +2989,7 @@ function familyVariations(pattern) {
   return FAMILY_VARIATIONS[pattern] || [];
 }
 
-const APP_RELEASE = Object.freeze({ version: '1.3.2', channel: 'distributed-review-support' });
+const APP_RELEASE = Object.freeze({ version: '1.3.3', channel: 'casual-review' });
 const KEY = 'english-journey-v061';
 const DEVICE_KEY = `${KEY}-device-id`;
 const SYNC_SCHEMA_VERSION = 1;
@@ -4202,6 +4269,7 @@ function freshState() {
     translationRevision: TRANSLATION_REVISION,
     completedDays: [],
     phraseProgress: {},
+    favoritePhraseIds: [],
     familyTransfers: {},
     dailyHistory: [],
     activityDates: [],
@@ -4224,6 +4292,9 @@ function upgradeState(raw = {}, options = {}) {
   const state = { ...base, ...(raw && typeof raw === 'object' ? raw : {}), version: 10, contentRevision: CONTENT_REVISION, translationRevision: TRANSLATION_REVISION };
   state.completedDays = Array.isArray(raw?.completedDays) ? [...new Set(raw.completedDays.filter(value => Number.isInteger(value) && value >= 1 && value <= curriculum.length))].sort((a,b)=>a-b) : [];
   state.phraseProgress = raw?.phraseProgress && typeof raw.phraseProgress === 'object' ? raw.phraseProgress : {};
+  state.favoritePhraseIds = Array.isArray(raw?.favoritePhraseIds)
+    ? [...new Set(raw.favoritePhraseIds.filter(id => typeof id === 'string' && phraseById[id]))]
+    : [];
   state.familyTransfers = raw?.familyTransfers && typeof raw.familyTransfers === 'object' ? raw.familyTransfers : {};
   state.dailyHistory = Array.isArray(raw?.dailyHistory) ? raw.dailyHistory.filter(Boolean).slice(-365) : [];
 
@@ -7761,7 +7832,7 @@ function saveNearMissFocus(state, phraseId, focus, now = new Date()) {
   return stored;
 }
 
-const VALID_ROUTES = new Set(['home','journey','library','stats','achievements','lesson','account']);
+const VALID_ROUTES = new Set(['home','journey','library','casual','stats','achievements','lesson','account']);
 function normalizeRoute(value) {
   const candidate = String(value || '').replace('#/', '') || 'home';
   return VALID_ROUTES.has(candidate) ? candidate : 'home';
@@ -7775,6 +7846,7 @@ let interactionError = RELEASE_INTEGRITY.ok ? null : 'Esta cópia do curso não 
 let recallRevealed = false;
 let listeningRevealed = false;
 let variationRevealed = false;
+let casualReview = { mode:null, phraseIds:[], index:0, revealed:false, length:10, autoPlayedIndex:-1 };
 
 function restoreTransientSessionUi(session = state.activeSession) {
   feedback = null;
@@ -7879,6 +7951,7 @@ function content() {
   if (!state?.onboardingDone) return firstRunView();
   if (route === 'journey') return journeyView();
   if (route === 'library') return libraryView();
+  if (route === 'casual') return casualReviewView();
   if (route === 'stats') return statsView();
   if (route === 'achievements') return achievementsView();
   if (route === 'lesson') return lessonView();
@@ -8146,8 +8219,8 @@ function postTaskReviewCard(state, now = new Date(), hasSession = false) {
   return `<section class="post-task-review">
     <div class="post-task-review-head"><div class="post-task-review-icon">↻</div><div><small>DIA CONCLUÍDO · PRÁTICA OPCIONAL</small><h2>${escapeHtml(title)}</h2><p>${escapeHtml(copy)}</p></div></div>
     <div class="post-task-review-meta"><span>${amount} frases</span><span>~5 min</span><span>0 frases novas</span>${sessions ? `<span>${sessions} revisão${sessions === 1 ? '' : 'ões'} extra${sessions === 1 ? '' : 's'} hoje</span>` : ''}</div>
-    <button type="button" class="primary full" data-free-review>${button}</button>
-    <small class="post-task-review-note">A Revisão Livre usa as frases mais úteis para reforçar agora, mas tem impacto leve no espaçamento para não “farmar” domínio repetindo tudo no mesmo dia.</small>
+    <div class="post-task-review-actions"><button type="button" class="primary" data-free-review>${button}</button><button type="button" class="ghost" data-nav="casual">REVISÃO CASUAL</button></div>
+    <small class="post-task-review-note">Revisão Inteligente pode contar revisões realmente vencidas. Revisão Casual é só contato extra e não altera o espaçamento.</small>
   </section>`;
 }
 
@@ -8415,11 +8488,197 @@ function journeyCard(day, currentDay = nextUnlockedDay(state)) {
   </article>`;
 }
 
+
+const CASUAL_MODES = Object.freeze({
+  browse: { icon:'▤', title:'Passar frases', subtitle:'Inglês e significado juntos. Só revisitar, sem teste.' },
+  'pt-en': { icon:'→', title:'Português → Inglês', subtitle:'Veja a ideia, pense na frase e revele quando quiser.' },
+  english: { icon:'EN', title:'Só inglês', subtitle:'Leia em inglês primeiro e revele o significado depois.' },
+  audio: { icon:'♪', title:'Só áudio', subtitle:'Escute antes de ver qualquer texto.' },
+  random: { icon:'◆', title:'Aleatórias', subtitle:'Misture frases de dias diferentes sem ordem previsível.' },
+  favorites: { icon:'★', title:'Favoritas', subtitle:'Passe apenas pelas frases que você marcou.' }
+});
+
+function isFavoritePhrase(phraseId) {
+  return Array.isArray(state.favoritePhraseIds) && state.favoritePhraseIds.includes(phraseId);
+}
+
+function casualSeenPhrases() {
+  return allPhrases.filter(phrase => getPhraseProgress(state, phrase.id).seen);
+}
+
+function casualShuffle(items) {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function casualPool(mode, limit = 10) {
+  let items = casualSeenPhrases();
+  if (mode === 'favorites') items = items.filter(phrase => isFavoritePhrase(phrase.id));
+  if (!items.length) return [];
+  if (mode === 'browse') {
+    items = [...items].sort((a,b) => {
+      const aProgress = getPhraseProgress(state, a.id);
+      const bProgress = getPhraseProgress(state, b.id);
+      const aSeen = aProgress.firstSeenAt ? new Date(aProgress.firstSeenAt).getTime() : 0;
+      const bSeen = bProgress.firstSeenAt ? new Date(bProgress.firstSeenAt).getTime() : 0;
+      return bSeen - aSeen;
+    });
+  } else {
+    items = casualShuffle(items);
+  }
+  return items.slice(0, Math.min(Math.max(1, Number(limit || 10)), items.length));
+}
+
+function startCasualReview(mode) {
+  const safeMode = CASUAL_MODES[mode] ? mode : 'browse';
+  const ids = casualPool(safeMode, casualReview.length).map(phrase => phrase.id);
+  if (!ids.length) {
+    interactionError = safeMode === 'favorites'
+      ? 'Você ainda não marcou nenhuma frase como favorita.'
+      : 'Estude algumas frases primeiro para liberar a Revisão Casual.';
+    casualReview = { ...casualReview, mode:null, phraseIds:[], index:0, revealed:false, autoPlayedIndex:-1 };
+    navigate('casual');
+    return;
+  }
+  casualReview = { ...casualReview, mode:safeMode, phraseIds:ids, index:0, revealed:false, autoPlayedIndex:-1 };
+  navigate('casual');
+}
+
+function casualCurrentPhrase() {
+  const id = casualReview.phraseIds?.[casualReview.index];
+  return id ? getPhrase(id) : null;
+}
+
+function casualReveal() {
+  if (!casualCurrentPhrase()) return;
+  casualReview.revealed = true;
+  render();
+}
+
+function casualNext() {
+  if (!casualReview.phraseIds?.length) return;
+  casualReview.index = Math.min(casualReview.index + 1, casualReview.phraseIds.length);
+  casualReview.revealed = false;
+  casualReview.autoPlayedIndex = -1;
+  render();
+}
+
+function casualPrevious() {
+  if (!casualReview.phraseIds?.length || casualReview.index <= 0) return;
+  casualReview.index -= 1;
+  casualReview.revealed = false;
+  casualReview.autoPlayedIndex = -1;
+  render();
+}
+
+function toggleFavoritePhrase(phraseId) {
+  if (!phraseById[phraseId] || !getPhraseProgress(state, phraseId).seen) return;
+  const current = new Set(Array.isArray(state.favoritePhraseIds) ? state.favoritePhraseIds : []);
+  if (current.has(phraseId)) current.delete(phraseId);
+  else current.add(phraseId);
+  state.favoritePhraseIds = [...current];
+  saveState(state, 'favorite-phrase');
+  render();
+}
+
+function casualModeGrid() {
+  const studied = casualSeenPhrases().length;
+  const favorites = casualSeenPhrases().filter(phrase => isFavoritePhrase(phrase.id)).length;
+  return `<section class="casual-hub">
+    <div class="casual-hero">
+      <span>↻</span>
+      <div><small>REVISÃO CASUAL</small><h1>Revisite inglês sem transformar tudo em tarefa.</h1><p>Sem nota, sem XP e sem alterar a próxima revisão. Você pode parar quando quiser.</p></div>
+    </div>
+    <div class="casual-length">
+      <small>QUANTAS AGORA?</small>
+      <div>${[5,10,20].map(value => `<button type="button" class="${casualReview.length === value ? 'active' : ''}" data-casual-length="${value}">${value}</button>`).join('')}</div>
+    </div>
+    <div class="casual-mode-grid">
+      ${Object.entries(CASUAL_MODES).map(([id,mode]) => `<button type="button" class="casual-mode-card ${id === 'favorites' && !favorites ? 'muted' : ''}" data-casual-mode="${id}">
+        <span>${mode.icon}</span><div><b>${mode.title}</b><p>${mode.subtitle}</p></div>${id === 'favorites' ? `<em>${favorites}</em>` : ''}
+      </button>`).join('')}
+    </div>
+    <p class="casual-safety">Você tem ${studied} frases disponíveis. Apenas marcar/desmarcar favoritas é salvo; passar ou revelar frases aqui não conta como acerto, erro ou revisão formal.</p>
+  </section>`;
+}
+
+function casualPracticeCard(phrase) {
+  const mode = casualReview.mode || 'browse';
+  const meta = CASUAL_MODES[mode] || CASUAL_MODES.browse;
+  const reveal = Boolean(casualReview.revealed);
+  const favorite = isFavoritePhrase(phrase.id);
+  const index = casualReview.index + 1;
+  const total = casualReview.phraseIds.length;
+  const bothVisible = ['browse','random','favorites'].includes(mode);
+  const showEnglish = bothVisible || mode === 'english' || (mode === 'pt-en' && reveal) || (mode === 'audio' && reveal);
+  const showPortuguese = bothVisible || mode === 'pt-en' || (mode === 'english' && reveal) || (mode === 'audio' && reveal);
+  const prompt = mode === 'pt-en' ? 'Pense em como você diria isso em inglês.'
+    : mode === 'english' ? 'Entenda a frase antes de revelar o significado.'
+      : mode === 'audio' ? 'Escute e tente entender antes de revelar.'
+        : 'Só passe pela frase no seu ritmo.';
+  return `<section class="casual-session">
+    <header class="casual-session-top">
+      <button type="button" data-casual-close aria-label="Voltar">‹</button>
+      <div><small>${escapeHtml(meta.title.toUpperCase())}</small><div class="casual-progress"><i style="width:${Math.round(index / total * 100)}%"></i></div></div>
+      <span>${index}/${total}</span>
+    </header>
+    <article class="casual-card mode-${escapeHtml(mode)}">
+      <div class="casual-card-actions">
+        <button type="button" class="casual-star ${favorite ? 'active' : ''}" data-casual-favorite="${phrase.id}" aria-label="${favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}">${favorite ? '★' : '☆'}</button>
+        ${mode !== 'audio' ? `<button type="button" class="casual-audio" data-audio="${phrase.id}" data-audio-speed="normal">🔊</button>` : ''}
+      </div>
+      <small>${escapeHtml(prompt)}</small>
+      ${mode === 'audio' && !reveal ? `<button type="button" class="casual-audio-main" data-audio="${phrase.id}" data-audio-speed="normal"><span>♪</span><b>OUVIR DE NOVO</b></button>` : ''}
+      ${showPortuguese ? `<div class="casual-portuguese ${mode === 'pt-en' && !reveal ? 'lead' : ''}">${escapeHtml(phrase.portuguese)}</div>` : ''}
+      ${showEnglish ? `<h1>${escapeHtml(phrase.english)}</h1>` : ''}
+      ${showEnglish && showPortuguese && mode !== 'pt-en' ? `<div class="casual-context">${escapeHtml(phrase.situation || phrase.context || '')}</div>` : ''}
+      ${!bothVisible && !reveal ? `<button type="button" class="primary big" data-casual-reveal>REVELAR</button>` : ''}
+      ${reveal && mode === 'audio' ? `<button type="button" class="casual-audio secondary" data-audio="${phrase.id}" data-audio-speed="slow">🐢 OUVIR DEVAGAR</button>` : ''}
+    </article>
+    <div class="casual-nav-actions">
+      <button type="button" class="ghost" data-casual-prev ${casualReview.index <= 0 ? 'disabled' : ''}>ANTERIOR</button>
+      <button type="button" class="primary" data-casual-next>PRÓXIMA</button>
+    </div>
+    <small class="casual-zero-impact">Modo casual · zero impacto no SRS</small>
+  </section>`;
+}
+
+function casualFinishedCard() {
+  const meta = CASUAL_MODES[casualReview.mode] || CASUAL_MODES.browse;
+  return `<section class="casual-finished">
+    <div>✓</div><small>RODADA CASUAL</small><h1>${casualReview.phraseIds.length} frases revisitadas.</h1>
+    <p>Nada foi marcado como certo ou errado. Seu calendário de revisão continua exatamente como estava.</p>
+    <button type="button" class="primary big" data-casual-mode="${escapeHtml(casualReview.mode || 'browse')}">MAIS ${casualReview.length}</button>
+    <button type="button" class="ghost big" data-casual-reset>ESCOLHER OUTRO MODO</button>
+  </section>`;
+}
+
+function casualReviewView() {
+  const studied = casualSeenPhrases().length;
+  if (!studied) return `${pageHeader('Revisão Casual', 'Uma forma leve de revisitar frases já estudadas.')}${emptyState('Ainda não há frases para revisitar.', 'Comece a Missão 40 e volte aqui depois.')}`;
+  if (!casualReview.mode || !casualReview.phraseIds.length) {
+    return `<header class="page-header"><button type="button" data-nav="library" aria-label="Voltar para Frases">‹</button><div><h1>Revisão Casual</h1><p>Revisite sem nota e sem alterar seu progresso formal.</p></div></header>${casualModeGrid()}`;
+  }
+  if (casualReview.index >= casualReview.phraseIds.length) return casualFinishedCard();
+  const phrase = casualCurrentPhrase();
+  if (!phrase) {
+    casualReview = { ...casualReview, mode:null, phraseIds:[], index:0, revealed:false, autoPlayedIndex:-1 };
+    return casualModeGrid();
+  }
+  return casualPracticeCard(phrase);
+}
+
 function libraryView() {
   const items = allPhrases.filter(p => getPhraseProgress(state, p.id).seen);
   const families = patternFamilyProgress(state).filter(family => family.discovered);
+  const favoriteCount = items.filter(phrase => isFavoritePhrase(phrase.id)).length;
   return `
     ${pageHeader('Minhas frases', 'Frases aprendidas e os padrões que começam a se repetir.')}
+    ${items.length ? `<section class="casual-library-entry"><div><span>↻</span><div><small>REVISÃO CASUAL</small><h2>Revisite sem compromisso</h2><p>Passar frases, português → inglês, só áudio, aleatórias e favoritas.</p></div></div><button type="button" class="primary" data-nav="casual">ABRIR</button><em>${favoriteCount} favoritas</em></section>` : ''}
     ${families.length ? `<section class="family-library"><header class="section-head compact"><div><small>FAMÍLIAS DESCOBERTAS</small><h2>${families.length} moldes reutilizáveis</h2></div><span>${families.filter(f => f.status === 'strong').length} fortes</span></header><div class="family-grid">${families.map(family => familyLibraryCard(family)).join('')}</div></section>` : ''}
     <header class="section-head compact phrase-library-head"><div><small>SUAS FRASES</small><h2>${items.length} frases encontradas</h2></div></header>
     ${items.length ? `<div class="phrase-list">${items.map(phrase => {
@@ -8435,7 +8694,7 @@ function libraryView() {
           <span class="phrase-state-badge ${status.id}">${status.label} · ${Math.round(mastery(p) * 100)}%</span>
           <small class="phrase-state-next">${hard ? `⚠ Em reforço: houve dificuldade recente. ${escapeHtml(status.next)}` : status.id === 'mastered' ? `✓ ${contactDays} dias de contato · ${escapeHtml(status.next)}` : escapeHtml(status.next)}</small>
         </div>
-        <span class="status-dot ${hard ? 'hard' : status.id}"></span>
+        <div class="phrase-row-actions"><button type="button" class="phrase-favorite ${isFavoritePhrase(phrase.id) ? 'active' : ''}" data-casual-favorite="${phrase.id}" aria-label="${isFavoritePhrase(phrase.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}">${isFavoritePhrase(phrase.id) ? '★' : '☆'}</button><span class="status-dot ${hard ? 'hard' : status.id}"></span></div>
       </article>`;
     }).join('')}</div>` : emptyState('Sua biblioteca ainda está vazia.', 'Conclua o primeiro dia e suas frases aparecerão aqui.')}
   `;
@@ -9126,6 +9385,24 @@ async function handleDocumentClick(event) {
     }
     if (el.hasAttribute('data-dismiss-achievements')) { state.recentAchievements = []; saveState(state); return render(); }
     if (el.dataset.start) return startDay(Number(el.dataset.start));
+    if (el.dataset.casualMode) return startCasualReview(el.dataset.casualMode);
+    if (el.dataset.casualLength) {
+      casualReview.length = [5,10,20].includes(Number(el.dataset.casualLength)) ? Number(el.dataset.casualLength) : 10;
+      casualReview.mode = null; casualReview.phraseIds = []; casualReview.index = 0; casualReview.revealed = false; casualReview.autoPlayedIndex = -1;
+      return render();
+    }
+    if (el.hasAttribute('data-casual-reveal')) return casualReveal();
+    if (el.hasAttribute('data-casual-next')) return casualNext();
+    if (el.hasAttribute('data-casual-prev')) return casualPrevious();
+    if (el.hasAttribute('data-casual-reset')) {
+      casualReview = { ...casualReview, mode:null, phraseIds:[], index:0, revealed:false, autoPlayedIndex:-1 };
+      return render();
+    }
+    if (el.hasAttribute('data-casual-close')) {
+      casualReview = { ...casualReview, mode:null, phraseIds:[], index:0, revealed:false, autoPlayedIndex:-1 };
+      return navigate('casual');
+    }
+    if (el.dataset.casualFavorite) return toggleFavoritePhrase(el.dataset.casualFavorite);
     if (el.hasAttribute('data-free-review')) return startFreeReview();
     if (el.hasAttribute('data-hard-practice')) return startHardPractice();
 
@@ -9184,6 +9461,14 @@ async function handleDocumentClick(event) {
 }
 
 function afterRender() {
+  if (route === 'casual' && casualReview.mode === 'audio' && casualReview.index < casualReview.phraseIds.length && casualReview.autoPlayedIndex !== casualReview.index) {
+    const phrase = casualCurrentPhrase();
+    if (phrase) {
+      casualReview.autoPlayedIndex = casualReview.index;
+      clearTimeout(pendingTimer);
+      pendingTimer = setTimeout(() => { try { speak(phrase.english); } catch {} }, 280);
+    }
+  }
   const item = state.activeSession?.items?.[state.activeSession?.index];
   if (route === 'lesson' && ['listening','listening-recall'].includes(item?.type) && !feedback && !listeningRevealed && !state.activeSession?.pendingNearMiss) {
     clearTimeout(pendingTimer);
