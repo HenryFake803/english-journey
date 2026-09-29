@@ -14,7 +14,7 @@
 <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
 
 
-<title>English Journey — V1.2.2</title>
+<title>English Journey — V1.2.3</title>
 <style>
 :root {
   --bg: #08101d;
@@ -2594,7 +2594,7 @@ function familyVariations(pattern) {
   return FAMILY_VARIATIONS[pattern] || [];
 }
 
-const APP_RELEASE = Object.freeze({ version: '1.2.2', channel: 'exercise-ambiguity-audit' });
+const APP_RELEASE = Object.freeze({ version: '1.2.3', channel: 'srs-stability-audit' });
 const KEY = 'english-journey-v061';
 const DEVICE_KEY = `${KEY}-device-id`;
 const SYNC_SCHEMA_VERSION = 1;
@@ -4179,7 +4179,33 @@ function dateKeyFromIso(value) {
 const BLOCK_SIZE = 10;
 const DAY_MS = 86400000;
 const MAX_INTERVAL_DAYS = 120;
+const SRS_INTERVAL_LADDER = Object.freeze([2, 3, 5, 8, 14, 21, 30, 45, 60, 90, 120]);
 const SKILLS = ['reading', 'listening', 'production'];
+
+function spacedIntervalFloor(successfulReviews = 0) {
+  const count = Math.max(1, Number(successfulReviews || 0));
+  return SRS_INTERVAL_LADDER[Math.min(SRS_INTERVAL_LADDER.length - 1, count - 1)];
+}
+
+function srsIntervalDays({ outcome, reviewKind, freeReview = false, stability = 1, skillScore = 0, successfulReviews = 0 }) {
+  if (outcome !== 'correct') return 1;
+  if (reviewKind === 'immediate' || reviewKind === 'recovery' || freeReview) return 1;
+  if (reviewKind === 'exit') return Math.max(1, Math.min(2, Math.round(stability)));
+  if (reviewKind === 'mini') return Math.max(2, Math.min(MAX_INTERVAL_DAYS, Math.round(stability)));
+
+  const adaptive = Math.max(2, Math.round(stability));
+  const floor = spacedIntervalFloor(successfulReviews);
+
+  // A escada evita intervalos erráticos; o limite por habilidade impede que
+  // uma frase "escape" por muitos dias quando a habilidade ainda está fraca.
+  const score = clamp(Number(skillScore || 0), 0, 1);
+  const weakSkillCeiling = score < 0.30 ? 2
+    : score < 0.48 ? 3
+      : score < 0.62 ? 7
+        : MAX_INTERVAL_DAYS;
+
+  return Math.max(2, Math.min(MAX_INTERVAL_DAYS, weakSkillCeiling, Math.max(adaptive, floor)));
+}
 
 
 
@@ -6392,11 +6418,12 @@ function recordOutcome(state, item, outcome, now = new Date(), meta = {}) {
   const almost = outcome === 'almost';
 
   if (correct) {
-    const kindFactor = item.freeReview ? 1.25 : item.reviewKind === 'immediate' ? 1.0 : item.reviewKind === 'recovery' ? 1.12 : item.reviewKind === 'exit' ? 1.18 : item.reviewKind === 'mini' ? 1.45 : item.reviewKind === 'hard' ? 1.65 : item.reviewKind === 'challenge' ? 1.7 : 2.15;
-    const latenessBonus = Math.min(0.65, overdueDays * 0.06);
+    const kindFactor = item.freeReview ? 1.20 : item.reviewKind === 'immediate' ? 1.0 : item.reviewKind === 'recovery' ? 1.10 : item.reviewKind === 'exit' ? 1.16 : item.reviewKind === 'mini' ? 1.40 : item.reviewKind === 'hard' ? 1.58 : item.reviewKind === 'challenge' ? 1.66 : 2.05;
+    // Atrasar uma revisão é evidência útil, mas não deve causar saltos gigantes.
+    const latenessBonus = Math.min(0.35, overdueDays * 0.04);
     stability = item.reviewKind === 'immediate'
       ? Math.max(1, stability)
-      : Math.min(MAX_INTERVAL_DAYS, Math.max(stability + 0.5, stability * (kindFactor - difficulty * 0.45 + latenessBonus)));
+      : Math.min(MAX_INTERVAL_DAYS, Math.max(stability + 0.5, stability * (kindFactor - difficulty * 0.42 + latenessBonus)));
     difficulty = clamp(difficulty - (item.reviewKind === 'immediate' ? 0.01 : 0.045), 0.1, 0.95);
     const countsAsSpacedReview = !item.freeReview && ['scheduled','practice','hard'].includes(item.reviewKind) && previousSkillReviewDay !== todayKey(now);
     const spacedDays = Array.isArray(skillState.successfulReviewDays) ? [...skillState.successfulReviewDays] : [];
@@ -6414,13 +6441,14 @@ function recordOutcome(state, item, outcome, now = new Date(), meta = {}) {
     skillState.lapses = Number(skillState.lapses || 0) + 1;
   }
 
-  let intervalDays;
-  if (!correct) intervalDays = 1;
-  else if (item.reviewKind === 'immediate' || item.reviewKind === 'recovery') intervalDays = 1;
-  else if (item.freeReview) intervalDays = 1;
-  else if (item.reviewKind === 'exit') intervalDays = Math.max(1, Math.min(2, Math.round(stability)));
-  else if (item.reviewKind === 'mini') intervalDays = Math.max(2, Math.round(stability));
-  else intervalDays = Math.max(2, Math.min(MAX_INTERVAL_DAYS, Math.round(stability)));
+  const intervalDays = srsIntervalDays({
+    outcome,
+    reviewKind: item.reviewKind,
+    freeReview: Boolean(item.freeReview),
+    stability,
+    skillScore: Number(current[skill] || 0),
+    successfulReviews: Number(skillState.successfulReviews || 0)
+  });
 
   schedule[skill] = {
     ...skillState,
