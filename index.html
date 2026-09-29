@@ -1252,6 +1252,19 @@ button:focus-visible,.choice:focus-visible,summary:focus-visible{outline:2px sol
   .mission-40-blocks { gap:5px; }
   .mission-40-blocks > div { padding:8px 3px; }
 }
+
+/* V1.3.1 — block completion clarity */
+.block-dots i.current { background:rgba(255,211,109,.18); box-shadow:inset 0 0 0 1px rgba(255,211,109,.22); }
+.block-recap.compact { text-align:left; }
+.block-recap.compact > small { display:block; margin-bottom:8px; }
+.block-recap-highlight { display:flex; align-items:baseline; gap:9px; margin-bottom:8px; }
+.block-recap-highlight strong { font-size:28px; letter-spacing:-.04em; color:#f5fbff; }
+.block-recap-highlight span { color:var(--muted); font-size:10px; }
+.block-recap-pills { display:flex !important; grid-template-columns:none !important; gap:7px !important; margin:0 !important; }
+.block-recap-pills span { display:inline-flex !important; width:auto; padding:7px 9px !important; border-radius:999px !important; font-size:9px !important; }
+.block-recap.compact details { margin-top:9px; }
+.block-recap.compact summary { cursor:pointer; color:var(--muted); font-size:9px; font-weight:850; }
+.block-recap.compact details p { margin:7px 0 0; color:var(--muted); font-size:9px; }
 </style>
 </head>
 <body>
@@ -8635,7 +8648,11 @@ function checkpointCard(item, session) {
     ${focus}
     ${item.id === 'session-checkout' ? `<section class="session-checkout-note"><small>SEM NOVAS FRASES</small><b>${item.checkoutCount || session.closureCount || 0} confirmações e acabou.</b><p>Este fechamento não aumenta sua meta diária e não cria repetição infinita. Ele só verifica os pontos que terminaram frágeis.</p></section>` : ''}
     ${recap}
-    ${item.blockNumber ? `<div class="block-dots">${Array.from({length:item.blockTotal}, (_,i) => `<i class="${i < item.blockNumber ? 'done' : ''}"></i>`).join('')}</div>` : ''}
+    ${item.blockNumber ? `<div class="block-dots">${Array.from({length:item.blockTotal}, (_,i) => {
+      const completed = isBlockEnd ? i < item.blockNumber : i < item.blockNumber - 1;
+      const current = !isBlockEnd && i === item.blockNumber - 1;
+      return `<i class="${completed ? 'done' : current ? 'current' : ''}"></i>`;
+    }).join('')}</div>` : ''}
     <button type="button" class="primary big" data-checkpoint-next>${isBlockEnd && item.blockNumber < DAILY_BLOCK_TARGET ? 'CONTINUAR PARA O PRÓXIMO BLOCO' : isBlockEnd ? 'SEGUIR PARA O FECHAMENTO' : isMini ? 'FAZER MINI REVISÃO' : 'CONTINUAR'}</button>
     ${isBlockEnd && item.blockNumber < DAILY_BLOCK_TARGET ? `<button type="button" class="ghost big pause-session" data-pause-session>PARAR POR HOJE</button><small class="pause-note">Ponto seguro criado. Você continua do próximo bloco quando voltar.</small>` : ''}
   </article>`;
@@ -8654,9 +8671,15 @@ function learningBridgeCard(learning) {
 function blockRecap(session, blockNumber) {
   const data = sessionBlockBreakdown(session, blockNumber);
   if (!data.attempts) return '';
-  const score = data.score == null ? '—' : `${data.score}%`;
   const introduced = session.items.filter(x => x?.type === 'intro' && Number(x.blockNumber) === Number(blockNumber)).length;
-  return `<section class="block-recap"><small>COMO FOI O BLOCO</small><div><span><b>${introduced}</b> novas</span><span><b>${data.correct}</b> lembrei</span><span><b>${data.almost}</b> quase</span><span><b>${data.wrong}</b> errei</span><span><b>${score}</b> retenção</span></div></section>`;
+  const needsReturn = Number(data.almost || 0) + Number(data.wrong || 0);
+  const score = data.score == null ? '—' : `${data.score}%`;
+  return `<section class="block-recap compact">
+    <small>COMO FOI O BLOCO</small>
+    <div class="block-recap-highlight"><strong>${data.correct}/${data.attempts}</strong><span>lembradas com segurança</span></div>
+    <div class="block-recap-pills"><span>${needsReturn} ${needsReturn === 1 ? 'volta' : 'voltam'} para reforço</span><span>${score} retenção</span></div>
+    <details><summary>Ver detalhes</summary><p>${introduced} novas · ${data.correct} lembrei · ${data.almost} quase · ${data.wrong} errei</p></details>
+  </section>`;
 }
 
 
