@@ -13,12 +13,10 @@
   "orientation": "any",
   "categories": ["education"],
   "icons": [
-    {"src":"./icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
-    {"src":"./icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"},
-    {"src":"./icons/icon-maskable-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
+    {"src":"./icons/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
   ],
   "shortcuts": [
-    {"name":"Continuar estudando","short_name":"Estudar","url":"./#/home","icons":[{"src":"./icons/icon-192.png","sizes":"192x192"}]},
-    {"name":"Conta e sincronização","short_name":"Conta","url":"./#/account","icons":[{"src":"./icons/icon-192.png","sizes":"192x192"}]}
+    {"name":"Continuar estudando","short_name":"Estudar","url":"./#/home"},
+    {"name":"Conta e sincronização","short_name":"Conta","url":"./#/account"}
   ]
 }
