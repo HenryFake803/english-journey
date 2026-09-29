@@ -8046,13 +8046,25 @@ function mission40Progress(day, appState) {
   return { seen, blocks, complete:seen >= Math.min(DAILY_NEW_TARGET, day.phrases.length) };
 }
 
-function mission40Card(day, appState) {
+function mission40Card(day, appState, plan = null) {
   const mission = mission40Progress(day, appState);
+  const dailyDone = Number(plan?.newIntroducedToday || 0) >= DAILY_NEW_TARGET;
+  const waitingNextDay = dailyDone && mission.seen === 0;
   const next = mission.blocks.find(block => !block.complete);
-  return `<section class="mission-40 ${mission.complete ? 'complete' : ''}">
-    <header><div><small>MISSÃO 40</small><strong>${mission.seen}/${Math.min(DAILY_NEW_TARGET, day.phrases.length)}</strong></div><span>${mission.complete ? '★ CONCLUÍDA' : next ? `PRÓXIMO · BLOCO ${next.number}` : ''}</span></header>
+  const displayComplete = mission.complete || waitingNextDay;
+
+  if (waitingNextDay) {
+    return `<section class="mission-40 complete">
+      <header><div><small>MISSÃO 40 · HOJE</small><strong>40/40</strong></div><span>★ CONCLUÍDA</span></header>
+      <div class="mission-40-blocks">${Array.from({length:DAILY_BLOCK_TARGET}, (_, index) => `<div class="done"><i>✓</i><b>10/10</b><span>bloco ${index + 1}</span></div>`).join('')}</div>
+      <p>Você já colocou 40 frases novas no ciclo hoje. O próximo dia do curso fica para amanhã; revisões continuam disponíveis.</p>
+    </section>`;
+  }
+
+  return `<section class="mission-40 ${displayComplete ? 'complete' : ''}">
+    <header><div><small>MISSÃO 40</small><strong>${mission.seen}/${Math.min(DAILY_NEW_TARGET, day.phrases.length)}</strong></div><span>${displayComplete ? '★ CONCLUÍDA' : next ? `PRÓXIMO · BLOCO ${next.number}` : ''}</span></header>
     <div class="mission-40-blocks">${mission.blocks.map(block => `<div class="${block.complete ? 'done' : block.current ? 'current' : ''}"><i>${block.complete ? '✓' : block.number}</i><b>${block.count}/10</b><span>bloco ${block.number}</span></div>`).join('')}</div>
-    <p>${mission.complete ? 'As 40 novas entraram no ciclo. Daqui para frente, hoje é manutenção opcional.' : 'Quatro blocos curtos de 10. Você pode pausar depois de cada bloco sem perder o ponto.'}</p>
+    <p>${displayComplete ? 'As 40 novas entraram no ciclo. Daqui para frente, hoje é manutenção opcional.' : 'Quatro blocos curtos de 10. Você pode pausar depois de cada bloco sem perder o ponto.'}</p>
   </section>`;
 }
 
@@ -8153,7 +8165,7 @@ function homeView() {
       <div class="today-card-head"><div><small>${completedAll ? 'CURSO BASE CONCLUÍDO' : `FASE ${phaseForDay(day.id)?.id || 5} · DIA ${day.id} DE 30`}</small><span>${s.streak ? `🔥 ${s.streak} ${s.streak === 1 ? 'dia' : 'dias'}` : 'Comece sua sequência'}</span></div></div>
       <h1>${completedAll ? 'Consolidar o que já é seu.' : day.title}</h1>
       <p>${completedAll ? 'As 1.200 frases já entraram no ciclo. Agora o foco é retenção, listening e produção.' : day.subtitle}</p>
-      ${!completedAll ? mission40Card(day, state) : ''}
+      ${!completedAll ? mission40Card(day, state, plan) : ''}
       <div class="today-answer"><small>O QUE FAZER AGORA</small><strong>${escapeHtml(dailyBrief.title)}</strong><p>${escapeHtml(dailyBrief.sequence)}</p></div>
       <div class="today-plan">
         <span class="due"><small>REVISÕES</small><b>${dailyBrief.reviewCount}</b><em>${dailyBrief.totalDue > dailyBrief.reviewCount && !hasSession ? `de ${dailyBrief.totalDue} vencidas` : 'prioridade agora'}</em></span>
