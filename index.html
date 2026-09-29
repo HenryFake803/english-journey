@@ -5459,46 +5459,6 @@ function retargetUpcomingExercises(session, appState, mode, focusSkill, limit = 
   return changed;
 }
 
-function futureNewBlockNumbers(session) {
-  const set = new Set();
-  for (let i = session.index + 1; i < (session.items || []).length; i++) {
-    const item = session.items[i];
-    if (item?.type === 'intro' && Number(item.blockNumber)) set.add(Number(item.blockNumber));
-  }
-  return [...set].sort((a,b) => a-b);
-}
-
-function deferLastFutureBlock(session) {
-  const future = futureNewBlockNumbers(session);
-  if (!future.length) return null;
-  const blockNumber = future.at(-1);
-  const phraseIds = new Set((session.items || []).filter((item, index) => index > session.index && item?.type === 'intro' && Number(item.blockNumber) === blockNumber).map(item => item.phraseId));
-  if (!phraseIds.size) return null;
-
-  session.items = session.items.filter((item, index) => {
-    if (index <= session.index) return true;
-    if (Number(item?.blockNumber) === blockNumber) return false;
-    if (item?.reviewKind === 'challenge' && phraseIds.has(item.phraseId)) return false;
-    return true;
-  });
-
-  session.newCount = (session.items || []).filter(item => item?.type === 'intro').length;
-  session.goal = Math.min(Number(session.goal ?? session.newCount), session.newCount);
-  const remainingBlocks = [...new Set((session.items || []).filter(item => item?.type === 'intro' && Number(item.blockNumber)).map(item => Number(item.blockNumber)))].sort((a,b) => a-b);
-  const blockTotal = Math.max(1, remainingBlocks.length);
-  for (const item of session.items || []) {
-    if (!Number(item?.blockNumber)) continue;
-    item.blockTotal = blockTotal;
-    if (item.type === 'checkpoint' && item.id?.startsWith('block-')) item.title = `${item.blockNumber}º bloco de ${blockTotal}`;
-  }
-  if (session.pacing) {
-    session.pacing.stopPoints = blockTotal;
-    session.pacing.challengeCount = (session.items || []).filter(item => item?.reviewKind === 'challenge').length;
-  }
-  session.estimatedMinutes = Math.max(5, Math.round(Number(session.newCount || 0) * .42 + Number(session.reviewCount || 0) * .16 + Number(session.hardCount || 0) * .22 + blockTotal * .55));
-  return { blockNumber, phraseCount: phraseIds.size };
-}
-
 function applyLiveSessionAdaptation(session, appState) {
   if (!session || isOptionalPracticeMode(session.mode) || !Array.isArray(session.outcomes)) return null;
   const signal = liveSessionSignal(session, 8);
@@ -5708,11 +5668,11 @@ function buildNextSessionBrief(appState, session, now = new Date()) {
   let mode = 'advance';
   if (slowed || closure.wrong > 0 || score < 68 || candidates.length >= 3) mode = 'review-first';
   else if (closure.almost > 0 || Number(session.almost || 0) >= 2 || weakSignals >= 2 || score < 84 || candidates.length) mode = 'balanced';
-  const label = mode === 'review-first' ? 'COMEÇAR REVISANDO' : mode === 'balanced' ? 'EQUILIBRAR PRIMEIRO' : 'PODE AVANÇAR';
+  const label = mode === 'review-first' ? 'AVANÇAR COM MAIS APOIO' : mode === 'balanced' ? 'AVANÇAR EQUILIBRANDO' : 'PODE AVANÇAR';
   const reason = mode === 'review-first'
-    ? `${focusLabel} terminou como a habilidade mais sensível. O motor vai procurar revisões vencidas desse foco antes de aumentar a exigência.`
+    ? `${focusLabel} terminou como a habilidade mais sensível. A próxima sessão distribui revisões desse foco entre os blocos, sem retirar as frases novas.`
     : mode === 'balanced'
-      ? `${focusLabel} ainda merece atenção, mas não há sinal para travar o avanço. A próxima sessão mistura revisão e conteúdo novo conforme o SRS.`
+      ? `${focusLabel} ainda merece atenção. A próxima sessão mistura revisões curtas com as novas, sem criar uma fila antes de começar.`
       : `A sessão terminou estável. O motor pode avançar e só puxará revisões quando a memória realmente pedir.`;
   return sanitizeNextSessionBrief({
     mode, label, focusSkill, focusLabel, reason,
@@ -5736,9 +5696,8 @@ function buildSession(state, dayId = nextUnlockedDay(state), now = new Date()) {
   const firstJourneySession = !allPhrases.some(phrase => getPhraseProgress(state, phrase.id).seen);
 
   const plan = sessionPlan(state, dayId, now);
-  const reviewPhrases = adaptiveReviewQueue(state, now, plan.focusSkill)
-    .filter(p => p.dayId < dayId || state.completedDays.includes(dayId) || getPhraseProgress(state, p.id).seen)
-    .slice(0, plan.reviewCount);
+  const reviewQueue = adaptiveReviewQueue(state, now, plan.focusSkill)
+    .filter(p => p.dayId < dayId || state.completedDays.includes(dayId) || getPhraseProgress(state, p.id).seen);
 
   const unseen = day.phrases.filter(p => !getPhraseProgress(state, p.id).seen);
   const selected = unseen.slice(0, plan.newGoal);
@@ -5750,8 +5709,21 @@ function buildSession(state, dayId = nextUnlockedDay(state), now = new Date()) {
     }))
     .filter(block => block.phrases.length);
   const items = [];
-  const reviewIds = new Set(reviewPhrases.map(p => p.id));
-  const hardPhrases = hardPracticePhrases(state, now, plan.hardLimit).filter(p => !reviewIds.has(p.id));
+  const hasNewBlocks = fixedBlocks.length > 0;
+  const hardCandidates = hardPracticePhrases(state, now, plan.hardLimit);
+  let hardPhrases = [];
+  let reviewPhrases = [];
+
+  if (hasNewBlocks) {
+    hardPhrases = hardCandidates.slice(0, plan.hardLimit);
+    const hardIds = new Set(hardPhrases.map(phrase => phrase.id));
+    const supportCap = fixedBlocks.length * 3;
+    reviewPhrases = reviewQueue.filter(phrase => !hardIds.has(phrase.id)).slice(0, Math.max(0, supportCap - hardPhrases.length));
+  } else {
+    reviewPhrases = reviewQueue.slice(0, plan.reviewCount);
+    const reviewIds = new Set(reviewPhrases.map(phrase => phrase.id));
+    hardPhrases = hardCandidates.filter(phrase => !reviewIds.has(phrase.id)).slice(0, plan.hardLimit);
+  }
 
   const scheduledSupport = reviewPhrases.map((phrase, index) => ({
     ...makeExercise(phrase, state, index + 500, true, recommendedExerciseType(getPhraseProgress(state, phrase.id), now), 'scheduled'),
