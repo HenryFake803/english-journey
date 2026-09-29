@@ -6281,7 +6281,7 @@ function buildFreeReviewSession(state, now = new Date(), limit = 12) {
   const items = [checkpoint(
     'free-review',
     'Revisão inteligente',
-    \`\${selected.length} frases que você já estudou. Nenhuma frase nova será adicionada ao curso.\`,
+    `${selected.length} frases que você já estudou. Nenhuma frase nova será adicionada ao curso.`,
     'REVISÃO LIVRE'
   )];
 
@@ -6292,7 +6292,7 @@ function buildFreeReviewSession(state, now = new Date(), limit = 12) {
   });
 
   return {
-    id: \`\${todayKey(now)}-free-review-\${now.getTime()}\`,
+    id: `${todayKey(now)}-free-review-${now.getTime()}`,
     dayId,
     startedAt: now.toISOString(),
     studyDate: todayKey(now),
