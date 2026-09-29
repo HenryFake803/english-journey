@@ -1337,6 +1337,8 @@ button:focus-visible,.choice:focus-visible,summary:focus-visible{outline:2px sol
   .casual-library-entry > button { width:100%; }
   .post-task-review-actions { grid-template-columns:1fr; }
 }
+
+.casual-mode-card:disabled { cursor:not-allowed; transform:none !important; }
 </style>
 </head>
 <body>
@@ -8598,9 +8600,12 @@ function casualModeGrid() {
       <div>${[5,10,20].map(value => `<button type="button" class="${casualReview.length === value ? 'active' : ''}" data-casual-length="${value}">${value}</button>`).join('')}</div>
     </div>
     <div class="casual-mode-grid">
-      ${Object.entries(CASUAL_MODES).map(([id,mode]) => `<button type="button" class="casual-mode-card ${id === 'favorites' && !favorites ? 'muted' : ''}" data-casual-mode="${id}">
-        <span>${mode.icon}</span><div><b>${mode.title}</b><p>${mode.subtitle}</p></div>${id === 'favorites' ? `<em>${favorites}</em>` : ''}
-      </button>`).join('')}
+      ${Object.entries(CASUAL_MODES).map(([id,mode]) => {
+        const emptyFavorites = id === 'favorites' && !favorites;
+        return `<button type="button" class="casual-mode-card ${emptyFavorites ? 'muted' : ''}" data-casual-mode="${id}" ${emptyFavorites ? 'disabled' : ''}>
+          <span>${mode.icon}</span><div><b>${mode.title}</b><p>${emptyFavorites ? 'Marque uma ☆ em Minhas frases para liberar este modo.' : mode.subtitle}</p></div>${id === 'favorites' ? `<em>${favorites}</em>` : ''}
+        </button>`;
+      }).join('')}
     </div>
     <p class="casual-safety">Você tem ${studied} frases disponíveis. Apenas marcar/desmarcar favoritas é salvo; passar ou revelar frases aqui não conta como acerto, erro ou revisão formal.</p>
   </section>`;
