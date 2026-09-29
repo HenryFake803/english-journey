@@ -6463,7 +6463,9 @@ function recordOutcome(state, item, outcome, now = new Date(), meta = {}) {
   const updatedScore = correct
     ? Math.min(1, score + (1 - score) * baseGain)
     : almost
-      ? Math.min(1, score + (1 - score) * 0.07)
+      // "Quase" é evidência parcial: ajuda uma habilidade muito nova, mas reduz
+      // confiança quando a frase já parecia forte. Assim QUASE nunca infla domínio.
+      ? clamp(score + (0.38 - score) * 0.12, 0, 1)
       : Math.max(0, score * 0.68 - 0.06);
   const reviewDays = [...new Set([...(current.reviewDays || []), todayKey(now)])];
 
