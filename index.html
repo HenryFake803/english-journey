@@ -6237,6 +6237,88 @@ function buildDifficultPracticeSession(state, now = new Date(), limit = 15) {
   };
 }
 
+
+function freeReviewCandidateScore(state, phrase, now = new Date()) {
+  const progress = getPhraseProgress(state, phrase.id);
+  let score = (1 - mastery(progress)) * 5 + difficultyScore(progress) * 3;
+  if (isDifficultPhrase(progress)) score += 2.5;
+  if (SKILLS.some(skill => recurringNearMissPattern(progress, skill))) score += 1.8;
+  if (progress.dueAt) {
+    const due = new Date(progress.dueAt);
+    if (due <= now) score += 4 + Math.min(3, Math.max(0, (now - due) / DAY_MS) * .35);
+  }
+  const lastDay = progress.lastReviewedAt ? dateKeyFromIso(progress.lastReviewedAt) : null;
+  if (lastDay === todayKey(now)) score -= 3.5;
+  return score;
+}
+
+function buildFreeReviewSession(state, now = new Date(), limit = 12) {
+  const seen = allPhrases.filter(phrase => getPhraseProgress(state, phrase.id).seen);
+  if (!seen.length) return null;
+
+  const primaryToday = [...(state.dailyHistory || [])].reverse()
+    .find(entry => entry?.date === todayKey(now) && !isOptionalPracticeMode(entry?.mode));
+  const lastCompletedDay = Array.isArray(state.completedDays) && state.completedDays.length ? state.completedDays[state.completedDays.length - 1] : null;
+  const dayId = Number(primaryToday?.dayId || lastCompletedDay || nextUnlockedDay(state) || 1);
+
+  const dueFirst = adaptiveReviewQueue(state, now)
+    .filter(phrase => getPhraseProgress(state, phrase.id).seen)
+    .slice(0, Math.min(4, limit));
+  const dueIds = new Set(dueFirst.map(phrase => phrase.id));
+  const rest = seen
+    .filter(phrase => !dueIds.has(phrase.id))
+    .sort((a,b) => freeReviewCandidateScore(state, b, now) - freeReviewCandidateScore(state, a, now));
+
+  const previousFree = freeReviewSessionsToday(state, now);
+  const slots = Math.max(0, limit - dueFirst.length);
+  const offset = rest.length ? (previousFree * Math.max(1, slots)) % rest.length : 0;
+  const rotated = rest.length ? [...rest.slice(offset), ...rest.slice(0, offset)] : [];
+  const selected = [...dueFirst, ...rotated].slice(0, Math.min(limit, seen.length));
+  if (!selected.length) return null;
+
+  const items = [checkpoint(
+    'free-review',
+    'Revisão inteligente',
+    \`\${selected.length} frases que você já estudou. Nenhuma frase nova será adicionada ao curso.\`,
+    'REVISÃO LIVRE'
+  )];
+
+  selected.forEach((phrase, index) => {
+    const progress = getPhraseProgress(state, phrase.id);
+    const type = recommendedExerciseType(progress, now);
+    items.push({ ...makeExercise(phrase, state, 5200 + previousFree * 37 + index, true, type, 'practice'), freeReview:true });
+  });
+
+  return {
+    id: \`\${todayKey(now)}-free-review-\${now.getTime()}\`,
+    dayId,
+    startedAt: now.toISOString(),
+    studyDate: todayKey(now),
+    index: 0,
+    correct: 0,
+    wrong: 0,
+    almost: 0,
+    items,
+    newCount: 0,
+    reviewCount: selected.length,
+    hardCount: 0,
+    recoveryCount: 0,
+    recovered: 0,
+    outcomes: [],
+    currentStreak: 0,
+    bestStreak: 0,
+    xpStart: Number(state.xp || 0),
+    achievementIdsStart: unlockedAchievementIds(state, now),
+    recoveryScheduled: {},
+    goal: 0,
+    mode: 'free-review',
+    daysMissedAtStart: 0,
+    dayTotal: curriculum.find(d => d.id === dayId)?.phrases.length || 0,
+    startedSeen: curriculum.find(d => d.id === dayId)?.phrases.filter(p => getPhraseProgress(state, p.id).seen).length || 0,
+    freeReviewNumber: previousFree + 1
+  };
+}
+
 function recordIntro(state, phraseId, now = new Date()) {
   markStudyActivity(state, now);
   const current = getPhraseProgress(state, phraseId);
@@ -6271,13 +6353,13 @@ function recordOutcome(state, item, outcome, now = new Date(), meta = {}) {
   const almost = outcome === 'almost';
 
   if (correct) {
-    const kindFactor = item.reviewKind === 'immediate' ? 1.0 : item.reviewKind === 'recovery' ? 1.12 : item.reviewKind === 'exit' ? 1.18 : item.reviewKind === 'mini' ? 1.45 : item.reviewKind === 'hard' ? 1.65 : item.reviewKind === 'challenge' ? 1.7 : 2.15;
+    const kindFactor = item.freeReview ? 1.25 : item.reviewKind === 'immediate' ? 1.0 : item.reviewKind === 'recovery' ? 1.12 : item.reviewKind === 'exit' ? 1.18 : item.reviewKind === 'mini' ? 1.45 : item.reviewKind === 'hard' ? 1.65 : item.reviewKind === 'challenge' ? 1.7 : 2.15;
     const latenessBonus = Math.min(0.65, overdueDays * 0.06);
     stability = item.reviewKind === 'immediate'
       ? Math.max(1, stability)
       : Math.min(MAX_INTERVAL_DAYS, Math.max(stability + 0.5, stability * (kindFactor - difficulty * 0.45 + latenessBonus)));
     difficulty = clamp(difficulty - (item.reviewKind === 'immediate' ? 0.01 : 0.045), 0.1, 0.95);
-    const countsAsSpacedReview = ['scheduled','practice','hard'].includes(item.reviewKind) && previousSkillReviewDay !== todayKey(now);
+    const countsAsSpacedReview = !item.freeReview && ['scheduled','practice','hard'].includes(item.reviewKind) && previousSkillReviewDay !== todayKey(now);
     const spacedDays = Array.isArray(skillState.successfulReviewDays) ? [...skillState.successfulReviewDays] : [];
     if (countsAsSpacedReview) spacedDays.push(todayKey(now));
     skillState.successfulReviewDays = [...new Set(spacedDays.filter(isDateKey))].sort().slice(-60);
@@ -6296,6 +6378,7 @@ function recordOutcome(state, item, outcome, now = new Date(), meta = {}) {
   let intervalDays;
   if (!correct) intervalDays = 1;
   else if (item.reviewKind === 'immediate' || item.reviewKind === 'recovery') intervalDays = 1;
+  else if (item.freeReview) intervalDays = 1;
   else if (item.reviewKind === 'exit') intervalDays = Math.max(1, Math.min(2, Math.round(stability)));
   else if (item.reviewKind === 'mini') intervalDays = Math.max(2, Math.round(stability));
   else intervalDays = Math.max(2, Math.min(MAX_INTERVAL_DAYS, Math.round(stability)));
@@ -6309,7 +6392,7 @@ function recordOutcome(state, item, outcome, now = new Date(), meta = {}) {
   };
 
   const score = current[skill] || 0;
-  const baseGain = item.reviewKind === 'immediate' ? 0.18 : item.reviewKind === 'recovery' ? 0.16 : item.reviewKind === 'exit' ? 0.12 : item.reviewKind === 'mini' ? 0.23 : 0.3;
+  const baseGain = item.freeReview ? 0.10 : item.reviewKind === 'immediate' ? 0.18 : item.reviewKind === 'recovery' ? 0.16 : item.reviewKind === 'exit' ? 0.12 : item.reviewKind === 'mini' ? 0.23 : 0.3;
   const updatedScore = correct
     ? Math.min(1, score + (1 - score) * baseGain)
     : almost
@@ -6319,14 +6402,16 @@ function recordOutcome(state, item, outcome, now = new Date(), meta = {}) {
 
   const calculatedDue = schedule[skill].dueAt;
   let phraseDue = calculatedDue;
-  if (correct && ['mini', 'challenge', 'immediate', 'exit'].includes(item.reviewKind) && current.dueAt) {
+  if (correct && item.freeReview) {
+    phraseDue = current.dueAt && new Date(current.dueAt) > now ? current.dueAt : calculatedDue;
+  } else if (correct && ['mini', 'challenge', 'immediate', 'exit'].includes(item.reviewKind) && current.dueAt) {
     phraseDue = new Date(current.dueAt) < new Date(calculatedDue) ? current.dueAt : calculatedDue;
   }
   if (!correct) phraseDue = new Date(now.getTime() + DAY_MS).toISOString();
 
   // Uma revisão programada conta como um checkpoint da frase. As outras habilidades
   // continuam com memória própria, mas não criam três itens vencidos para a mesma frase.
-  if (['scheduled','practice','hard'].includes(item.reviewKind)) {
+  if (!item.freeReview && ['scheduled','practice','hard'].includes(item.reviewKind)) {
     for (const otherSkill of SKILLS) {
       const other = schedule[otherSkill] || defaultSkillSchedule();
       if (!other.dueAt || new Date(other.dueAt) <= now) other.dueAt = phraseDue;
