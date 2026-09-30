@@ -7,16 +7,40 @@
   "start_url": "./#/home",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["standalone","minimal-ui"],
-  "background_color": "#08101d",
-  "theme_color": "#0b1220",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "background_color": "#07111f",
+  "theme_color": "#075547",
   "orientation": "any",
-  "categories": ["education"],
+  "categories": [
+    "education"
+  ],
   "icons": [
-    {"src":"./icons/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
   ],
   "shortcuts": [
-    {"name":"Continuar estudando","short_name":"Estudar","url":"./#/home"},
-    {"name":"Conta e sincronização","short_name":"Conta","url":"./#/account"}
+    {
+      "name": "Continuar estudando",
+      "short_name": "Estudar",
+      "url": "./#/home"
+    },
+    {
+      "name": "Conta e sincronização",
+      "short_name": "Conta",
+      "url": "./#/account"
+    }
   ]
 }
