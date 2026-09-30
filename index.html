@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<meta name="theme-color" content="#0b1220" />
+<meta name="theme-color" content="#075547" />
 <meta name="description" content="English Journey — curso de inglês por frases com revisão adaptativa, listening e produção." />
 <meta name="application-name" content="English Journey" />
 <meta name="mobile-web-app-capable" content="yes" />
@@ -14,7 +14,7 @@
 <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
 
 
-<title>English Journey — V1.3.3</title>
+<title>English Journey — V1.3.4</title>
 <style>
 :root {
   --bg: #07111f;
@@ -1339,6 +1339,10 @@ button:focus-visible,.choice:focus-visible,summary:focus-visible{outline:2px sol
 }
 
 .casual-mode-card:disabled { cursor:not-allowed; transform:none !important; }
+
+/* V1.3.4 — identidade visual */
+.brand-mark { overflow:hidden; padding:0; background:#064d40 !important; border:1px solid rgba(120,237,171,.18) !important; box-shadow:0 8px 22px rgba(3,68,56,.28) !important; }
+.brand-mark img { display:block; width:100%; height:100%; object-fit:cover; }
 </style>
 </head>
 <body>
@@ -2991,7 +2995,7 @@ function familyVariations(pattern) {
   return FAMILY_VARIATIONS[pattern] || [];
 }
 
-const APP_RELEASE = Object.freeze({ version: '1.3.3', channel: 'casual-review' });
+const APP_RELEASE = Object.freeze({ version: '1.3.4', channel: 'brand-icon-refresh' });
 const KEY = 'english-journey-v061';
 const DEVICE_KEY = `${KEY}-device-id`;
 const SYNC_SCHEMA_VERSION = 1;
@@ -7964,7 +7968,7 @@ function content() {
 function firstRunView() {
   const audio = audioOutputAvailable();
   return `<section class="first-run-shell">
-    <div class="first-run-brand"><div class="brand-mark">E</div><span>English Journey · inglês por frases</span></div>
+    <div class="first-run-brand"><div class="brand-mark"><img src="./icons/icon.svg" alt="" aria-hidden="true" /></div><span>English Journey · inglês por frases</span></div>
     <article class="first-run-card">
       <small>SEU PRIMEIRO BLOCO</small>
       <h1>Aprenda frases úteis usando-as desde o começo.</h1>
@@ -8259,7 +8263,7 @@ function homeView() {
   const dailyBrief = dailyStudyBrief(plan, { completedAll, activeSession: hasSession ? state.activeSession : null });
 
   return `
-    <header class="topbar"><div class="brand-mark">E</div><div><b>English Journey</b><span>aprenda · lembre · domine</span></div><div class="xp-pill">${state.xp} XP</div>${accountTopButton()}</header>
+    <header class="topbar"><div class="brand-mark"><img src="./icons/icon.svg" alt="" aria-hidden="true" /></div><div><b>English Journey</b><span>aprenda · lembre · domine</span></div><div class="xp-pill">${state.xp} XP</div>${accountTopButton()}</header>
     ${storageBanner()}
     ${interactionError ? `<section class="calendar-banner recovery"><div>!</div><div><small>SESSÃO RECUPERADA</small><h3>O curso evitou uma trava.</h3><p>${escapeHtml(interactionError)}</p></div></section>` : ''}
     ${recovery}
