@@ -1,5 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-<rect width="512" height="512" rx="112" fill="#0b1220"/>
-<circle cx="256" cy="256" r="178" fill="#71e7a5"/>
-<path d="M156 151h200v54H216v76h124v52H216v78h144v54H156z" fill="#08101d"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="English Journey">
+  <defs>
+    <linearGradient id="bg" x1="70" y1="50" x2="455" y2="470" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#27e780"/>
+      <stop offset=".42" stop-color="#078d67"/>
+      <stop offset="1" stop-color="#034438"/>
+    </linearGradient>
+    <linearGradient id="trail" x1="150" y1="345" x2="355" y2="190" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#62f08b"/>
+      <stop offset=".58" stop-color="#d8ffe6"/>
+      <stop offset="1" stop-color="#f5fff8"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#002d24" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <path d="M120 126c0-31 25-56 56-56h160c31 0 56 25 56 56v206c0 31-25 56-56 56H224l-81 48 18-48h-5c-20 0-36-16-36-36V126Z"
+        fill="none" stroke="#effff4" stroke-width="28" stroke-linejoin="round" stroke-linecap="round" opacity=".98" filter="url(#soft)"/>
+  <path d="M165 326c70 4 157-3 171-45 10-31-35-40-71-45-29-4-43-16-31-29 18-19 61-20 95-24"
+        fill="none" stroke="url(#trail)" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="164" cy="326" r="22" fill="#f8fff9" filter="url(#soft)"/>
+  <path d="M344 154c-26 0-47 21-47 47 0 36 47 82 47 82s47-46 47-82c0-26-21-47-47-47Z" fill="#64f47d" filter="url(#soft)"/>
+  <circle cx="344" cy="201" r="16" fill="#065447"/>
 </svg>
