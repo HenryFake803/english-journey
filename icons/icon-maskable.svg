@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="English Journey">
+  <defs>
+    <linearGradient id="bg" x1="40" y1="30" x2="490" y2="500" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#24d97a"/>
+      <stop offset=".45" stop-color="#08785d"/>
+      <stop offset="1" stop-color="#033c33"/>
+    </linearGradient>
+    <linearGradient id="trail" x1="154" y1="331" x2="351" y2="205" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#65f08d"/>
+      <stop offset=".58" stop-color="#d9ffe7"/>
+      <stop offset="1" stop-color="#f5fff8"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <path d="M137 143c0-27 22-49 49-49h141c27 0 49 22 49 49v181c0 27-22 49-49 49h-99l-67 40 15-40h-8c-17 0-31-14-31-31V143Z"
+        fill="none" stroke="#effff4" stroke-width="24" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M174 310c60 4 136-3 148-38 9-27-30-35-61-39-25-4-37-14-27-25 16-16 53-18 82-21"
+        fill="none" stroke="url(#trail)" stroke-width="27" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="173" cy="310" r="19" fill="#f8fff9"/>
+  <path d="M330 167c-23 0-41 18-41 41 0 31 41 71 41 71s41-40 41-71c0-23-18-41-41-41Z" fill="#64f47d"/>
+  <circle cx="330" cy="208" r="14" fill="#065447"/>
+</svg>
