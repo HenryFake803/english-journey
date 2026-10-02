@@ -1,46 +1,27 @@
 {
   "id": "./",
-  "name": "English Journey",
-  "short_name": "English Journey",
-  "description": "Curso de inglês por frases com revisão adaptativa, listening, produção e sincronização entre dispositivos.",
-  "lang": "pt-BR",
-  "start_url": "./#/home",
+  "name": "Única Coisa",
+  "short_name": "Única Coisa",
+  "description": "Clareza para escolher, executar, revisar e proteger o que mais importa.",
+  "start_url": "./?source=pwa",
   "scope": "./",
   "display": "standalone",
-  "display_override": [
-    "standalone",
-    "minimal-ui"
-  ],
-  "background_color": "#07111f",
-  "theme_color": "#075547",
-  "orientation": "any",
-  "categories": [
-    "education"
-  ],
+  "background_color": "#f4f1e9",
+  "theme_color": "#f4f1e9",
+  "lang": "pt-BR",
+  "categories": ["productivity", "lifestyle"],
   "icons": [
     {
-      "src": "./icons/icon.svg",
+      "src": "./icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "./icons/icon-maskable.svg",
+      "src": "./icon-maskable.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "maskable"
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "Continuar estudando",
-      "short_name": "Estudar",
-      "url": "./#/home"
-    },
-    {
-      "name": "Conta e sincronização",
-      "short_name": "Conta",
-      "url": "./#/account"
     }
   ]
 }
