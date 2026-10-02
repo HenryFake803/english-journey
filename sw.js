@@ -1,9 +1,58 @@
-const CACHE_NAME = 'english-journey-shell-v1.3.4';
-const CORE = ['./','./index.html','./manifest.webmanifest','./icons/icon.svg','./icons/icon-maskable.svg'];
-const SUPABASE_CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
-self.addEventListener('install', event => { event.waitUntil((async () => { const cache=await caches.open(CACHE_NAME); await cache.addAll(CORE); try { const response=await fetch(SUPABASE_CDN,{mode:'cors'}); if(response.ok) await cache.put(SUPABASE_CDN,response.clone()); } catch {} await self.skipWaiting(); })()); });
-self.addEventListener('activate', event => { event.waitUntil((async () => { const names=await caches.keys(); await Promise.all(names.filter(name=>name.startsWith('english-journey-')&&name!==CACHE_NAME).map(name=>caches.delete(name))); await self.clients.claim(); })()); });
-self.addEventListener('fetch', event => { const request=event.request; if(request.method!=='GET') return; const url=new URL(request.url); if(url.hostname.endsWith('.supabase.co')) return; if(request.mode==='navigate'){ event.respondWith((async()=>{ try { const response=await fetch(request); if(response.ok){const cache=await caches.open(CACHE_NAME); await cache.put('./index.html',response.clone());} return response; } catch { return (await caches.match('./index.html')) || (await caches.match('./')) || Response.error(); } })()); return; } if(request.url===SUPABASE_CDN){ event.respondWith((async()=>{ const cached=await caches.match(request); const network=fetch(request).then(async response=>{ if(response.ok){const cache=await caches.open(CACHE_NAME); await cache.put(request,response.clone());} return response; }).catch(()=>null); return cached || (await network) || Response.error(); })()); return; } if(url.origin===self.location.origin){ event.respondWith((async()=>{ const cached=await caches.match(request); if(cached) return cached; try { const response=await fetch(request); if(response.ok){const cache=await caches.open(CACHE_NAME); await cache.put(request,response.clone());} return response; } catch { return Response.error(); } })()); } });
+const CACHE = 'unica-coisa-v019-render';
+const CORE = [
+  './',
+  './index.html',
+  './manifest.webmanifest',
+  './icon.svg',
+  './icon-maskable.svg'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)));
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))
+      .then(() => self.clients.claim())
+  );
+});
+
 self.addEventListener('message', event => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          const copy = response.clone();
+          caches.open(CACHE).then(cache => cache.put('./index.html', copy));
+          return response;
+        })
+        .catch(async () => (await caches.match('./index.html')) || (await caches.match('./')))
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(event.request).then(cached => {
+      const network = fetch(event.request)
+        .then(response => {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then(cache => cache.put(event.request, copy));
+          }
+          return response;
+        })
+        .catch(() => cached);
+      return cached || network;
+    })
+  );
 });
