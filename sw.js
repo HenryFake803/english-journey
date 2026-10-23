@@ -1,9 +1,7 @@
-const CACHE_NAME = 'english-journey-shell-v1.3.4';
-const CORE = ['./','./index.html','./manifest.webmanifest','./icons/icon.svg','./icons/icon-maskable.svg'];
-const SUPABASE_CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
-self.addEventListener('install', event => { event.waitUntil((async () => { const cache=await caches.open(CACHE_NAME); await cache.addAll(CORE); try { const response=await fetch(SUPABASE_CDN,{mode:'cors'}); if(response.ok) await cache.put(SUPABASE_CDN,response.clone()); } catch {} await self.skipWaiting(); })()); });
-self.addEventListener('activate', event => { event.waitUntil((async () => { const names=await caches.keys(); await Promise.all(names.filter(name=>name.startsWith('english-journey-')&&name!==CACHE_NAME).map(name=>caches.delete(name))); await self.clients.claim(); })()); });
-self.addEventListener('fetch', event => { const request=event.request; if(request.method!=='GET') return; const url=new URL(request.url); if(url.hostname.endsWith('.supabase.co')) return; if(request.mode==='navigate'){ event.respondWith((async()=>{ try { const response=await fetch(request); if(response.ok){const cache=await caches.open(CACHE_NAME); await cache.put('./index.html',response.clone());} return response; } catch { return (await caches.match('./index.html')) || (await caches.match('./')) || Response.error(); } })()); return; } if(request.url===SUPABASE_CDN){ event.respondWith((async()=>{ const cached=await caches.match(request); const network=fetch(request).then(async response=>{ if(response.ok){const cache=await caches.open(CACHE_NAME); await cache.put(request,response.clone());} return response; }).catch(()=>null); return cached || (await network) || Response.error(); })()); return; } if(url.origin===self.location.origin){ event.respondWith((async()=>{ const cached=await caches.match(request); if(cached) return cached; try { const response=await fetch(request); if(response.ok){const cache=await caches.open(CACHE_NAME); await cache.put(request,response.clone());} return response; } catch { return Response.error(); } })()); } });
-self.addEventListener('message', event => {
-  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
-});
+const CACHE='english-daily-v1.6-20261023';
+const SHELL=['/','/index.html','/icon.svg','/manifest.webmanifest'];
+self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));
+self.addEventListener('activate',e=>e.waitUntil(Promise.all([caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('english-daily-')&&k!==CACHE).map(k=>caches.delete(k)))),self.clients.claim()])));
+self.addEventListener('fetch',e=>{const q=e.request;if(q.method!=='GET'||new URL(q.url).origin!==self.location.origin)return;
+ if(q.mode==='navigate'){e.respondWith(fetch(q).then(r=>{if(r.ok){const cp=r.clone();caches.open(CACHE).then(c=>c.put('/index.html',cp));}return r;}).catch(()=>caches.match('/index.html')));return;}
+ e.respondWith(caches.match(q).then(c=>c||fetch(q)));});
